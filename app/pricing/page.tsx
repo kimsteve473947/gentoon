@@ -130,7 +130,7 @@ export default function PricingPage() {
       const data = await response.json();
 
       if (response.ok && data.valid) {
-        setReferralDiscount(30); // 30% 할인
+        setReferralDiscount(20); // 20% 할인 (첫 달)
         setReferralError(null);
       } else {
         setReferralDiscount(0);
@@ -276,7 +276,7 @@ export default function PricingPage() {
               <h3 className="font-semibold text-lg">추천인 코드 입력</h3>
               {referralDiscount > 0 && (
                 <Badge className="ml-auto bg-green-500">
-                  {referralDiscount}% 할인 적용!
+                  첫 달 {referralDiscount}% 할인 적용!
                 </Badge>
               )}
             </div>
@@ -311,7 +311,7 @@ export default function PricingPage() {
               )}
               {referralDiscount > 0 && (
                 <p className="text-sm text-green-600">
-                  ✨ 추천인 코드가 확인되었습니다! 모든 유료 플랜에 30% 할인이 적용됩니다.
+                  ✨ 추천인 코드가 확인되었습니다! 모든 유료 플랜에 첫 달 20% 할인이 적용됩니다.
                 </p>
               )}
             </div>
@@ -352,7 +352,7 @@ export default function PricingPage() {
                         {plan.priceUnit && <span className="text-muted-foreground">{plan.priceUnit}</span>}
                       </div>
                       <Badge className="mt-2 bg-green-500">
-                        {referralDiscount}% 할인 적용
+                        첫 달 {referralDiscount}% 할인 적용
                       </Badge>
                     </div>
                   ) : (

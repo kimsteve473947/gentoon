@@ -22,25 +22,25 @@ export const SUBSCRIPTION_PLANS = {
     id: "FREE",
     name: "Free",
     price: 0,
-    tokens: 10,         // 10 토큰
-    characters: 2,
+    tokens: 10000,      // 1만 토큰
+    characters: 1,
     projects: 3,
     description: "취미로 시작하는 분들께",
   },
   PRO: {
     id: "PRO",
-    name: "Pro",
+    name: "Basic",
     price: 30000,
-    tokens: 500000,     // 50만 토큰
+    tokens: 400000,     // 40만 토큰
     characters: 3,
     projects: Infinity,
     description: "정기적으로 창작하는 분들께",
   },
   PREMIUM: {
     id: "PREMIUM",
-    name: "Premium",
+    name: "Pro",
     price: 100000,
-    tokens: 2000000,    // 200만 토큰
+    tokens: 1500000,    // 150만 토큰
     characters: 5,
     projects: Infinity,
     description: "전문 창작자를 위한",

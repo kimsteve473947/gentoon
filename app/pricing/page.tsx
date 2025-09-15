@@ -49,7 +49,7 @@ export default function PricingPage() {
       description: "취미로 시작하는 분들께",
       price: "₩0",
       features: [
-        { text: "10 토큰 제공", included: true },
+        { text: "1만 토큰 제공", included: true },
         { text: "1GB 저장공간", included: true },
         { text: "캐릭터 1개 등록", included: true },
         { text: "프로젝트 3개", included: true },
@@ -64,13 +64,13 @@ export default function PricingPage() {
       planId: "FREE"
     },
     {
-      name: "Pro",
+      name: "Basic",
       description: "정기적으로 창작하는 분들께",
       price: "₩30,000",
       originalPrice: 30000,
       priceUnit: "/월",
       features: [
-        { text: "50만 토큰 제공", included: true },
+        { text: "40만 토큰 제공", included: true },
         { text: "10GB 저장공간", included: true },
         { text: "캐릭터 3개 등록", included: true },
         { text: "무제한 프로젝트", included: true },
@@ -85,13 +85,13 @@ export default function PricingPage() {
       planId: "PRO"
     },
     {
-      name: "Premium",
+      name: "Pro",
       description: "전문 창작자를 위한",
       price: "₩100,000",
       originalPrice: 100000,
       priceUnit: "/월",
       features: [
-        { text: "200만 토큰 제공", included: true },
+        { text: "150만 토큰 제공", included: true },
         { text: "50GB 저장공간", included: true },
         { text: "캐릭터 5개 등록", included: true },
         { text: "무제한 프로젝트", included: true },

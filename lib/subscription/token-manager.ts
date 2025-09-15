@@ -25,7 +25,7 @@ const SUBSCRIPTION_CONFIG = {
   FREE: {
     name: '무료',
     price: 0,                          // 무료
-    platformTokens: 10000,             // 10,000 토큰 (약 7-8장 이미지 생성 가능)
+    platformTokens: 10000,             // 1만 토큰 (약 7-8장 이미지 생성 가능)
     maxImages: 8,                      // 월 이미지 생성 한도 (실제 기준)
     dailyLimit: 3,                     // 일일 생성 한도 (하루 3장)
     maxCharacters: 1,
@@ -33,24 +33,24 @@ const SUBSCRIPTION_CONFIG = {
     profit: -520,                      // 무료 플랜
   },
   PRO: {
-    name: '프로',
+    name: '베이직',
     price: 30000,                      // 월 3만원
-    platformTokens: 500000,            // 50만 토큰 (약 387장 이미지 생성 가능)
-    maxImages: 387,                    // 월 이미지 생성 한도 (실제 기준)
-    dailyLimit: 20,                    // 일일 생성 한도 (하루 20장)
+    platformTokens: 400000,            // 40만 토큰 (약 310장 이미지 생성 가능)
+    maxImages: 310,                    // 월 이미지 생성 한도 (실제 기준)
+    dailyLimit: 15,                    // 일일 생성 한도 (하루 15장)
     maxCharacters: 3,
-    estimatedCost: 20000,              // 예상 원가 (387 × 52원)
-    profit: 10000,                     // 수익 마진
+    estimatedCost: 16000,              // 예상 원가 (310 × 52원)
+    profit: 14000,                     // 수익 마진
   },
   PREMIUM: {
-    name: '프리미엄',
+    name: '프로',
     price: 100000,                     // 월 10만원
-    platformTokens: 2000000,           // 200만 토큰 (약 1,550장 이미지 생성 가능)
-    maxImages: 1550,                   // 월 이미지 생성 한도 (실제 기준)
-    dailyLimit: 60,                    // 일일 생성 한도 (하루 60장)
+    platformTokens: 1500000,           // 150만 토큰 (약 1,163장 이미지 생성 가능)
+    maxImages: 1163,                   // 월 이미지 생성 한도 (실제 기준)
+    dailyLimit: 50,                    // 일일 생성 한도 (하루 50장)
     maxCharacters: 5,
-    estimatedCost: 80000,              // 예상 원가 (1550 × 52원)
-    profit: 20000,                     // 수익 마진
+    estimatedCost: 60000,              // 예상 원가 (1163 × 52원)
+    profit: 40000,                     // 수익 마진
   },
   ADMIN: {
     name: '관리자',

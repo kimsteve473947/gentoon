@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 const GEMINI_COST = {
   TOKENS_PER_IMAGE: 1290,           // Gemini 실제 토큰 소비량
   COST_PER_MILLION: 30,              // $30 per 1M tokens
-  USD_TO_KRW: 1330,                   // 환율
+  USD_TO_KRW: 1450,                   // 환율
   COST_PER_IMAGE_KRW: 52,            // 이미지당 원가 (원)
 } as const;
 
@@ -27,7 +27,6 @@ const SUBSCRIPTION_CONFIG = {
     price: 0,                          // 무료
     platformTokens: 10000,             // 1만 토큰 (약 7-8장 이미지 생성 가능)
     maxImages: 8,                      // 월 이미지 생성 한도 (실제 기준)
-    dailyLimit: 3,                     // 일일 생성 한도 (하루 3장)
     maxCharacters: 1,
     estimatedCost: 520,                // 예상 원가 (8 × 65원)
     profit: -520,                      // 무료 플랜
@@ -37,7 +36,6 @@ const SUBSCRIPTION_CONFIG = {
     price: 30000,                      // 월 3만원
     platformTokens: 400000,            // 40만 토큰 (약 310장 이미지 생성 가능)
     maxImages: 310,                    // 월 이미지 생성 한도 (실제 기준)
-    dailyLimit: 15,                    // 일일 생성 한도 (하루 15장)
     maxCharacters: 3,
     estimatedCost: 16000,              // 예상 원가 (310 × 52원)
     profit: 14000,                     // 수익 마진
@@ -46,8 +44,7 @@ const SUBSCRIPTION_CONFIG = {
     name: '프로',
     price: 100000,                     // 월 10만원
     platformTokens: 1500000,           // 150만 토큰 (약 1,163장 이미지 생성 가능)
-    maxImages: 1163,                   // 월 이미지 생성 한도 (실제 기준)
-    dailyLimit: 50,                    // 일일 생성 한도 (하루 50장)
+    maxImages: 1163,                   // 월 이미지 생성 한도 (실제 기준)                  
     maxCharacters: 5,
     estimatedCost: 60000,              // 예상 원가 (1163 × 52원)
     profit: 40000,                     // 수익 마진
@@ -57,7 +54,6 @@ const SUBSCRIPTION_CONFIG = {
     price: 0,                          // 무료 (관리자)
     platformTokens: 999999999,         // 무제한 토큰
     maxImages: 999999999,              // 무제한 이미지 생성
-    dailyLimit: 999999999,             // 무제한 일일 생성
     maxCharacters: 999,                // 무제한 캐릭터
     estimatedCost: 0,                  // 관리자는 비용 없음
     profit: 0,                         // 관리자 계정
@@ -66,7 +62,6 @@ const SUBSCRIPTION_CONFIG = {
 
 // 토큰 관리 서비스
 export class TokenManager {
-  private dailyUsageCache: Map<string, { date: string; count: number }> = new Map();
 
   /**
    * Supabase 클라이언트 생성 (서버용)
@@ -251,15 +246,11 @@ export class TokenManager {
         description: options?.description || '토큰 사용'
       });
 
-      // 일일 사용량 업데이트 (이미지 기준)
-      if (options?.imageCount) {
-        await this.updateDailyUsage(userId, options.imageCount);
-      }
+      // 사용량 기록 완료
 
       return {
         success: true,
         remainingTokens: subscriptionData.tokensTotal - newTokensUsed,
-        dailyRemaining: 999999, // TODO: 실제 일일 한도 구현 시 수정
       };
     } catch (error) {
       console.error("❌ Actual token usage error:", error);
@@ -299,16 +290,7 @@ export class TokenManager {
         };
       }
 
-      // 일일 한도 체크
-      const dailyCheck = await this.checkDailyLimit(userId, subscription.plan);
-      if (!dailyCheck.allowed) {
-        return {
-          success: false,
-          error: `일일 생성 한도 초과 (${dailyCheck.used}/${dailyCheck.limit})`,
-          remainingTokens: subscription.tokensTotal - subscription.tokensUsed,
-          dailyRemaining: 0,
-        };
-      }
+      // 토큰 충분성 체크만 진행
 
       // 필요 토큰 계산 (소수점 처리)
       let requiredTokens = imageCount * PLATFORM_PRICING.TOKENS_PER_IMAGE;
@@ -327,7 +309,6 @@ export class TokenManager {
           success: false,
           error: `토큰 부족 (필요: ${requiredTokens}, 보유: ${remainingTokens})`,
           remainingTokens,
-          dailyRemaining: dailyCheck.limit - dailyCheck.used,
         };
       }
 
@@ -353,13 +334,9 @@ export class TokenManager {
       // metadata는 별도 테이블에 저장 (필요시)
       // 또는 description에 JSON 문자열로 포함
 
-      // 일일 사용량 업데이트
-      await this.updateDailyUsage(userId, imageCount);
-
       return {
         success: true,
         remainingTokens: remainingTokens - requiredTokens,
-        dailyRemaining: dailyCheck.limit - dailyCheck.used - imageCount,
       };
     } catch (error) {
       console.error("Token usage error:", error);
@@ -370,43 +347,13 @@ export class TokenManager {
     }
   }
 
-  // 일일 한도 체크 (테스트용으로 간소화)
-  private async checkDailyLimit(
-    userId: string,
-    plan: SubscriptionPlan
-  ): Promise<{ allowed: boolean; used: number; limit: number }> {
-    const config = SUBSCRIPTION_CONFIG[plan as keyof typeof SUBSCRIPTION_CONFIG];
-    if (!config) {
-      return { allowed: false, used: 0, limit: 0 };
-    }
-
-    // 테스트용: 항상 허용
-    return {
-      allowed: true,
-      used: 0,
-      limit: config.dailyLimit,
-    };
-  }
-
-  // 일일 사용량 캐시 업데이트
-  private async updateDailyUsage(userId: string, count: number): Promise<void> {
-    const today = new Date().toISOString().split('T')[0];
-    const cached = this.dailyUsageCache.get(userId);
-    
-    if (cached && cached.date === today) {
-      cached.count += count;
-    } else {
-      this.dailyUsageCache.set(userId, { date: today, count });
-    }
-  }
+  // 일일 제한 없음 - 월간 토큰 한도만 체크
 
   // 토큰 잔액 조회 (상세 정보)
   async getBalance(userId: string): Promise<{
     balance: number;
     used: number;
     total: number;
-    dailyUsed: number;
-    dailyLimit: number;
     estimatedImagesRemaining: number;
   }> {
     try {
@@ -425,8 +372,6 @@ export class TokenManager {
           balance: 0,
           used: 0,
           total: 0,
-          dailyUsed: 0,
-          dailyLimit: 0,
           estimatedImagesRemaining: 0,
         };
       }
@@ -441,28 +386,21 @@ export class TokenManager {
       if (!subscription) {
         // 구독이 없으면 기본 FREE 플랜으로 처리
         const freeConfig = SUBSCRIPTION_CONFIG.FREE;
-        const dailyCheck = await this.checkDailyLimit(userId, 'FREE');
         
         return {
           balance: freeConfig.platformTokens,
           used: 0,
           total: freeConfig.platformTokens,
-          dailyUsed: dailyCheck.used,
-          dailyLimit: dailyCheck.limit,
           estimatedImagesRemaining: Math.floor(freeConfig.platformTokens / GEMINI_COST.TOKENS_PER_IMAGE),
         };
       }
 
-      const config = SUBSCRIPTION_CONFIG[subscription.plan as keyof typeof SUBSCRIPTION_CONFIG];
-      const dailyCheck = await this.checkDailyLimit(userId, subscription.plan);
       const balance = subscription.tokensTotal - subscription.tokensUsed;
 
       return {
         balance,
         used: subscription.tokensUsed,
         total: subscription.tokensTotal,
-        dailyUsed: dailyCheck.used,
-        dailyLimit: dailyCheck.limit,
         estimatedImagesRemaining: Math.floor(balance / GEMINI_COST.TOKENS_PER_IMAGE),
       };
     } catch (error) {
@@ -471,8 +409,6 @@ export class TokenManager {
         balance: 0,
         used: 0,
         total: 0,
-        dailyUsed: 0,
-        dailyLimit: 0,
         estimatedImagesRemaining: 0,
       };
     }
@@ -496,8 +432,7 @@ export class TokenManager {
         },
       });
 
-      // 캐시 초기화
-      this.dailyUsageCache.delete(userId);
+      // 토큰 리셋 완료
     } catch (error) {
       console.error("Reset monthly tokens error:", error);
       throw error;

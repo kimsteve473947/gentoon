@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=lzxkvtwuatsrczhctsxb"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_7fa69616084177fe05864f7523e5e1c5103848a0"
+      }
+    },
+    "simple-mcp": {
+      "command": "node",
+      "args": [
+        "/Users/gimjunghwi/Desktop/인스타툰/simple-mcp-server.js"
+      ]
+    }
+  }
+}

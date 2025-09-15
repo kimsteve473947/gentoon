@@ -1,0 +1,318 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 사용자 모델 (Supabase Auth와 연동)
+model User {
+  id                String         @id // Supabase Auth의 user.id를 직접 사용
+  email             String         @unique
+  name              String?
+  avatarUrl         String?        // Supabase 필드명 통일
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 구독 정보
+  subscription      Subscription?
+  
+  // 스토리지 정보
+  storage           UserStorage?
+  
+  // 관계
+  projects          Project[]
+  characters        Character[]
+  generations       Generation[]
+  transactions      Transaction[]
+  referralCode      String         @unique @default(uuid())
+  referredBy        String?
+  referralRewards   ReferralReward[] @relation("referrer")
+  referredRewards   ReferralReward[] @relation("referred")
+  
+  @@index([id])
+  @@index([email])
+  @@map("user")
+}
+
+// 구독 모델
+model Subscription {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 플랜 정보
+  plan              SubscriptionPlan @default(FREE)
+  tokensTotal       Int            @default(0)
+  tokensUsed        Int            @default(0)
+  maxCharacters     Int            @default(1)
+  maxProjects       Int            @default(3)
+  
+  // 결제 정보
+  tossBillingKey    String?        // 빌링키 (정기결제용)
+  tossCustomerKey   String?        // 고객 고유 키
+  tossCustomerId    String?        // 토스 고객 ID (deprecated)
+  tossSubscriptionId String?       // 토스 구독 ID (deprecated)
+  
+  // 구독 기간
+  currentPeriodStart DateTime      @default(now())
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean       @default(false)
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([userId])
+  @@map("subscription")
+}
+
+// 구독 플랜 enum
+enum SubscriptionPlan {
+  FREE        // 무료: 10토큰, 캐릭터 1개, 프로젝트 3개
+  PRO         // 프로: 50만 토큰, 캐릭터 3개, 무제한 프로젝트
+  PREMIUM     // 프리미엄: 200만 토큰, 캐릭터 5개, 무제한 프로젝트
+}
+
+// 캐릭터 모델
+model Character {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  description       String         @db.Text
+  styleGuide        String?        @db.Text
+  
+  // 레퍼런스 이미지들
+  referenceImages   Json           // 원본 URL 배열
+  ratioImages       Json?          // 비율별 처리된 이미지 { "1:1": [...], "4:5": [...] }
+  thumbnailUrl      String?
+  
+  // 캐릭터 메타데이터 (외모, 의상, 성격 등)
+  metadata          Json?          // visualFeatures, clothing, personality, aliases 등
+  
+  isPublic          Boolean        @default(false)
+  isFavorite        Boolean        @default(false)
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 관계
+  generations       Generation[]
+  projects          ProjectCharacter[]
+  
+  @@index([userId])
+  @@map("character")
+}
+
+// 프로젝트 모델
+model Project {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title             String
+  description       String?        @db.Text
+  thumbnailUrl      String?        // 자동 생성된 썸네일
+  panelCount        Int            @default(0)  // 프리컴퓨팅된 패널 개수
+  
+  // 🚀 성능 최적화 필드 추가
+  lastPanelImageUrl String?        // 마지막으로 생성된 이미지
+  isEmpty           Boolean        @default(true)   // 빈 프로젝트 여부
+  hasContent        Boolean        @default(false)  // 실제 콘텐츠 유무
+  contentSummary    String?        // "3개 패널, 2개 이미지" 형태
+  lastEditedAt      DateTime       @updatedAt       // 마지막 편집 시간 (정렬용)
+  
+  status            ProjectStatus  @default(DRAFT)
+  isPublic          Boolean        @default(false)
+  
+  // 삭제 관련 (휴지통 기능)
+  deletedAt         DateTime?      // soft delete
+  
+  // 메타데이터
+  metadata          Json?          // 추가 설정 정보
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  publishedAt       DateTime?
+  
+  // 관계
+  panels            Panel[]
+  generations       Generation[]
+  characters        ProjectCharacter[]
+  
+  // 🚀 최적화된 인덱스
+  @@index([userId, hasContent, lastEditedAt])  // 프로젝트 리스트 조회용
+  @@index([userId, isEmpty])                   // 빈 프로젝트 필터링용
+  @@index([userId, deletedAt])                 // 휴지통 조회용
+  @@index([status])
+  @@map("project")
+}
+
+// 프로젝트 상태 enum
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+// 프로젝트-캐릭터 관계 테이블
+model ProjectCharacter {
+  id                String         @id @default(uuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  characterId       String
+  character         Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime       @default(now())
+  
+  @@unique([projectId, characterId])
+  @@index([projectId])
+  @@index([characterId])
+  @@map("project_character")
+}
+
+// 패널 모델 (웹툰의 각 컷)
+model Panel {
+  id                String         @id @default(uuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  order             Int            // 패널 순서
+  prompt            String         @db.Text
+  imageUrl          String?
+  
+  // 편집 데이터 (말풍선, 텍스트 등)
+  editData          Json?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 관계
+  generation        Generation?
+  
+  @@unique([projectId, order])
+  @@index([projectId])
+  @@map("panel")
+}
+
+// AI 생성 기록
+model Generation {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projectId         String?
+  project           Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  
+  panelId           String?        @unique
+  panel             Panel?         @relation(fields: [panelId], references: [id], onDelete: SetNull)
+  
+  characterId       String?
+  character         Character?     @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  
+  // 생성 정보
+  prompt            String         @db.Text
+  negativePrompt    String?        @db.Text
+  
+  // 결과
+  imageUrl          String
+  thumbnailUrl      String?
+  
+  // 메타데이터
+  model             String         @default("gemini-2-5-flash-image-preview")
+  tokensUsed        Int            @default(2)
+  generationTime    Int?           // 밀리초
+  metadata          Json?
+  
+  createdAt         DateTime       @default(now())
+  
+  @@index([userId])
+  @@index([projectId])
+  @@map("generation")
+}
+
+// 거래 내역
+model Transaction {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type              TransactionType
+  amount            Int            // 원 단위
+  tokens            Int?           // 토큰 수량
+  
+  // 결제 정보
+  tossPaymentKey    String?
+  tossOrderId       String?
+  
+  status            TransactionStatus @default(PENDING)
+  description       String?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@map("transaction")
+}
+
+// 거래 유형 enum
+enum TransactionType {
+  SUBSCRIPTION      // 구독 결제
+  TOKEN_PURCHASE    // 토큰 구매
+  REFUND           // 환불
+  REFERRAL_REWARD  // 추천 보상
+}
+
+// 거래 상태 enum
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+// 추천인 보상 기록
+model ReferralReward {
+  id                String         @id @default(uuid())
+  
+  referrerId        String
+  referrer          User           @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  
+  referredId        String
+  referred          User           @relation("referred", fields: [referredId], references: [id], onDelete: Cascade)
+  
+  tokensRewarded    Int            @default(50)
+  
+  createdAt         DateTime       @default(now())
+  
+  @@unique([referrerId, referredId])
+  @@index([referrerId])
+  @@index([referredId])
+  @@map("referral_reward")
+}
+
+// 🚀 사용자별 스토리지 사용량 추적 모델
+model UserStorage {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  usedBytes         Int            @default(0) @map("used_bytes")
+  fileCount         Int            @default(0) @map("file_count")
+  maxBytes          Int            @default(1073741824) @map("max_bytes") // 기본 1GB
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  
+  @@index([userId])
+  @@index([usedBytes])
+  @@map("user_storage")
+}

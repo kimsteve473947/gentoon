@@ -1,0 +1,348 @@
+/**
+ * 갤러리 시스템 타입 정의
+ * 외주 프로젝트 기능 포함
+ */
+
+// 기본 갤러리 시리즈 타입 (기존 + 확장)
+export interface GallerySeries {
+  // 기존 필드
+  id: string;
+  title: string;
+  description: string;
+  author: string;
+  tags: string[];
+  thumbnail_url: string;
+  cover_image_url: string;
+  category: string;
+  status: SeriesStatus;
+  rating: number;
+  view_count: number;
+  like_count: number;
+  is_featured: boolean;
+  is_premium: boolean;
+  created_at: string;
+  updated_at: string;
+
+  // 새로 추가된 외주 프로젝트 필드
+  is_outsourced: boolean;
+  client_company?: string;
+  client_brand?: string;
+  project_type: ProjectType;
+  aspect_ratio: AspectRatio;
+  target_platform: TargetPlatform;
+  display_order: number;
+  is_published: boolean;
+  client_metadata: Record<string, any>;
+  project_brief?: string;
+  completed_at?: string;
+  delivered_at?: string;
+}
+
+// 갤러리 에피소드 타입 (기존 + 확장)
+export interface GalleryEpisode {
+  // 기존 필드
+  id: string;
+  series_id: string;
+  title: string;
+  description?: string;
+  episode_number: number;
+  thumbnail_url?: string;
+  panels_data: PanelData[];
+  is_premium: boolean;
+  view_count: number;
+  like_count: number;
+  created_at: string;
+  updated_at: string;
+
+  // 새로 추가된 인스타툰 최적화 필드
+  instagram_order?: number;
+  slide_count: number;
+  caption?: string;
+  hashtags: string[];
+  social_media_optimized: boolean;
+  call_to_action?: string;
+}
+
+// 외주 프로젝트 협업 관리 타입
+export interface GallerySeriesCollaboration {
+  id: string;
+  series_id: string;
+  
+  // 클라이언트 정보
+  client_company: string;
+  client_contact_name?: string;
+  client_contact_email?: string;
+  client_contact_phone?: string;
+  
+  // 프로젝트 관리
+  project_manager_id?: string;
+  deadline?: string;
+  budget_range?: string;
+  payment_status: PaymentStatus;
+  
+  // 진행 상태
+  progress_status: ProgressStatus;
+  revision_count: number;
+  
+  // 파일 관리
+  working_files_url: string[];
+  final_files_url: string[];
+  
+  // 메타데이터
+  notes?: string;
+  requirements: Record<string, any>;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+// 열거형 타입들
+export type SeriesStatus = 'ongoing' | 'completed' | 'hiatus' | 'cancelled';
+
+export type ProjectType = 
+  | 'webtoon' 
+  | 'instatoon' 
+  | 'advertisement' 
+  | 'promotional' 
+  | 'branding';
+
+export type AspectRatio = '1:1' | '4:5' | '16:9' | '9:16';
+
+export type TargetPlatform = 
+  | 'web' 
+  | 'instagram' 
+  | 'facebook' 
+  | 'youtube' 
+  | 'tiktok' 
+  | 'blog';
+
+export type PaymentStatus = 'pending' | 'partial' | 'completed';
+
+export type ProgressStatus = 
+  | 'planning' 
+  | 'in_progress' 
+  | 'review' 
+  | 'revision' 
+  | 'completed' 
+  | 'delivered';
+
+// 패널 데이터 타입 (기존)
+export interface PanelData {
+  id: string;
+  type: 'image' | 'text' | 'bubble';
+  content: string;
+  position: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  style?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+// API 응답 타입들
+export interface GallerySeriesResponse {
+  success: boolean;
+  series: GallerySeries[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  filters: {
+    category?: string;
+    featured: boolean;
+    search?: string;
+    // 새로 추가된 필터
+    is_outsourced?: boolean;
+    project_type?: ProjectType;
+    client_company?: string;
+  };
+}
+
+export interface GalleryEpisodeResponse {
+  success: boolean;
+  episode: GalleryEpisode;
+  series: GallerySeries;
+  nextEpisode?: {
+    id: string;
+    title: string;
+    episode_number: number;
+  };
+  prevEpisode?: {
+    id: string;
+    title: string;
+    episode_number: number;
+  };
+}
+
+// 갤러리 검색/필터 타입
+export interface GalleryFilters {
+  category?: string;
+  featured?: boolean;
+  search?: string;
+  // 새로 추가된 외주 프로젝트 필터
+  is_outsourced?: boolean;
+  project_type?: ProjectType;
+  client_company?: string;
+  aspect_ratio?: AspectRatio;
+  target_platform?: TargetPlatform;
+  // 정렬
+  sort_by?: 'created_at' | 'updated_at' | 'view_count' | 'like_count' | 'display_order';
+  sort_order?: 'asc' | 'desc';
+}
+
+// 갤러리 통계 타입
+export interface GalleryStats {
+  total_series: number;
+  total_episodes: number;
+  total_views: number;
+  total_likes: number;
+  // 외주 프로젝트 통계
+  outsourced_projects: number;
+  clients_count: number;
+  completed_projects: number;
+  ongoing_projects: number;
+  // 프로젝트 타입별 통계
+  project_types: Record<ProjectType, number>;
+  // 플랫폼별 통계
+  platforms: Record<TargetPlatform, number>;
+}
+
+// 관리자 업로드를 위한 타입들
+export interface CreateGallerySeriesRequest {
+  title: string;
+  description: string;
+  author: string;
+  tags: string[];
+  category: string;
+  thumbnail_url?: string;
+  cover_image_url?: string;
+  // 외주 프로젝트 필드
+  is_outsourced: boolean;
+  client_company?: string;
+  client_brand?: string;
+  project_type: ProjectType;
+  aspect_ratio: AspectRatio;
+  target_platform: TargetPlatform;
+  display_order?: number;
+  is_published?: boolean;
+  client_metadata?: Record<string, any>;
+  project_brief?: string;
+}
+
+export interface CreateGalleryEpisodeRequest {
+  series_id: string;
+  title: string;
+  description?: string;
+  episode_number: number;
+  thumbnail_url?: string;
+  panels_data: PanelData[];
+  // 인스타툰 최적화 필드
+  instagram_order?: number;
+  slide_count?: number;
+  caption?: string;
+  hashtags?: string[];
+  social_media_optimized?: boolean;
+  call_to_action?: string;
+}
+
+export interface CreateCollaborationRequest {
+  series_id: string;
+  client_company: string;
+  client_contact_name?: string;
+  client_contact_email?: string;
+  client_contact_phone?: string;
+  project_manager_id?: string;
+  deadline?: string;
+  budget_range?: string;
+  requirements?: Record<string, any>;
+  notes?: string;
+}
+
+// 갤러리 뷰 모드 타입
+export type GalleryViewMode = 'all' | 'featured' | 'outsourced' | 'internal';
+
+// 인스타툰 특화 타입
+export interface InstagramOptimizedEpisode extends GalleryEpisode {
+  instagram_order: number;
+  slide_count: number;
+  hashtags: string[];
+  caption?: string;
+  call_to_action?: string;
+}
+
+// 회사별 갤러리 타입
+export interface CompanyGallery {
+  company_name: string;
+  company_logo?: string;
+  total_projects: number;
+  completed_projects: number;
+  ongoing_projects: number;
+  total_episodes: number;
+  total_views: number;
+  total_likes: number;
+  latest_project?: GallerySeries;
+  featured_projects: GallerySeries[];
+  project_types: ProjectType[];
+  collaboration_period: {
+    start_date: string;
+    end_date?: string;
+  };
+}
+
+// 에러 타입
+export interface GalleryError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
+}
+
+// 유틸리티 타입들
+export type PartialGallerySeries = Partial<GallerySeries>;
+export type PartialGalleryEpisode = Partial<GalleryEpisode>;
+
+// 갤러리 상태 관리를 위한 타입 (Zustand 등에서 사용)
+export interface GalleryState {
+  // 현재 로드된 데이터
+  series: GallerySeries[];
+  currentSeries?: GallerySeries;
+  currentEpisode?: GalleryEpisode;
+  
+  // 로딩 상태
+  loading: boolean;
+  error?: GalleryError;
+  
+  // 필터 및 검색
+  filters: GalleryFilters;
+  viewMode: GalleryViewMode;
+  
+  // 페이지네이션
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  
+  // 액션들
+  actions: {
+    fetchSeries: (filters?: GalleryFilters) => Promise<void>;
+    fetchSeriesById: (id: string) => Promise<void>;
+    fetchEpisode: (seriesId: string, episodeId: string) => Promise<void>;
+    updateFilters: (filters: Partial<GalleryFilters>) => void;
+    setViewMode: (mode: GalleryViewMode) => void;
+    likeSeries: (seriesId: string) => Promise<void>;
+    likeEpisode: (episodeId: string) => Promise<void>;
+    clearError: () => void;
+  };
+}
+
+// 내보내기
+export default GallerySeries;

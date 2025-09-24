@@ -1,0 +1,456 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델 (Supabase Auth와 연동)
+model User {
+  id                String         @id // Supabase Auth의 user.id를 직접 사용
+  email             String         @unique
+  name              String?
+  avatarUrl         String?        // Supabase 필드명 통일
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 구독 정보
+  subscription      Subscription?
+  
+  // 스토리지 정보
+  storage           UserStorage?
+  
+  // 관계
+  projects          Project[]
+  characters        Character[]
+  elements          Element[]        // ✨ 요소 추가
+  generations       Generation[]
+  transactions      Transaction[]
+  referralCode      String         @unique @default(uuid())
+  referredBy        String?
+  referralRewards   ReferralReward[] @relation("referrer")
+  referredRewards   ReferralReward[] @relation("referred")
+  
+  // 🚀 성능 최적화 관계
+  dailyUsageStats   DailyUsageStats[]
+  usageCache        UserUsageCache?
+  
+  // 🚀 고객 지원
+  inquiries         Inquiry[]
+  
+  @@index([id])
+  @@index([email])
+  @@map("user")
+}
+
+// 구독 모델
+model Subscription {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 플랜 정보
+  plan              SubscriptionPlan @default(FREE)
+  tokensTotal       Int            @default(0)
+  tokensUsed        Int            @default(0)
+  maxCharacters     Int            @default(1)
+  
+  // 결제 정보
+  tossBillingKey    String?        // 빌링키 (정기결제용)
+  tossCustomerKey   String?        // 고객 고유 키
+  tossCustomerId    String?        // 토스 고객 ID (deprecated)
+  tossSubscriptionId String?       // 토스 구독 ID (deprecated)
+  
+  // 구독 기간
+  currentPeriodStart DateTime      @default(now())
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean       @default(false)
+  
+  // 토큰 사용량 초기화 추적
+  tokensResetDate    DateTime      @default(now()) // 토큰이 마지막으로 초기화된 날짜
+  nextTokensReset    DateTime      // 다음 토큰 초기화 예정일 (결제일 기준 30일)
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([userId])
+  @@map("subscription")
+}
+
+// 구독 플랜 enum
+enum SubscriptionPlan {
+  FREE        // 무료: 10토큰, 캐릭터 1개, 프로젝트 3개
+  PRO         // 프로: 50만 토큰, 캐릭터 3개, 무제한 프로젝트
+  PREMIUM     // 프리미엄: 200만 토큰, 캐릭터 5개, 무제한 프로젝트
+  ADMIN       // 관리자: 무제한 토큰, 무제한 캐릭터, 무제한 프로젝트
+}
+
+// 캐릭터 모델
+model Character {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  description       String         @db.Text
+  styleGuide        String?        @db.Text
+  
+  // 레퍼런스 이미지들
+  referenceImages   Json           // 원본 URL 배열
+  ratioImages       Json?          // 비율별 처리된 이미지 { "1:1": [...], "4:5": [...] }
+  thumbnailUrl      String?
+  
+  // 캐릭터 메타데이터 (외모, 의상, 성격 등)
+  metadata          Json?          // visualFeatures, clothing, personality, aliases 등
+  
+  isPublic          Boolean        @default(false)
+  isFavorite        Boolean        @default(false)
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 관계
+  generations       Generation[]
+  projects          ProjectCharacter[]
+  
+  @@index([userId])
+  @@map("character")
+}
+
+// ✨ 요소(Element) 모델 - 캐릭터와 비슷하지만 비율 처리 없음
+model Element {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  description       String?        @db.Text
+  
+  // 이미지 정보 (비율 처리 없이 단순 저장)
+  imageUrl          String         // WebP로 변환된 원본 이미지
+  thumbnailUrl      String?        // 작은 썸네일
+  
+  // 요소 메타데이터
+  category          String?        // 사용자 정의 카테고리
+  tags              Json?          // 태그들 배열
+  
+  isPublic          Boolean        @default(false)
+  isFavorite        Boolean        @default(false)
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([userId])
+  @@map("element")
+}
+
+// 프로젝트 모델
+model Project {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title             String
+  description       String?        @db.Text
+  thumbnailUrl      String?        // 자동 생성된 썸네일
+  panelCount        Int            @default(0)  // 프리컴퓨팅된 패널 개수
+  
+  // 🚀 성능 최적화 필드 추가
+  lastPanelImageUrl String?        // 마지막으로 생성된 이미지
+  isEmpty           Boolean        @default(true)   // 빈 프로젝트 여부
+  hasContent        Boolean        @default(false)  // 실제 콘텐츠 유무
+  contentSummary    String?        // "3개 패널, 2개 이미지" 형태
+  lastEditedAt      DateTime       @updatedAt       // 마지막 편집 시간 (정렬용)
+  
+  status            ProjectStatus  @default(DRAFT)
+  isPublic          Boolean        @default(false)
+  
+  // 삭제 관련 (휴지통 기능)
+  deletedAt         DateTime?      // soft delete
+  
+  // 메타데이터
+  metadata          Json?          // 추가 설정 정보
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  publishedAt       DateTime?
+  
+  // 관계
+  panels            Panel[]
+  generations       Generation[]
+  characters        ProjectCharacter[]
+  
+  // 🚀 최적화된 인덱스
+  @@index([userId, hasContent, lastEditedAt])  // 프로젝트 리스트 조회용
+  @@index([userId, isEmpty])                   // 빈 프로젝트 필터링용
+  @@index([userId, deletedAt])                 // 휴지통 조회용
+  @@index([status])
+  @@map("project")
+}
+
+// 프로젝트 상태 enum
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+// 프로젝트-캐릭터 관계 테이블
+model ProjectCharacter {
+  id                String         @id @default(uuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  characterId       String
+  character         Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime       @default(now())
+  
+  @@unique([projectId, characterId])
+  @@index([projectId])
+  @@index([characterId])
+  @@map("project_character")
+}
+
+// 패널 모델 (웹툰의 각 컷)
+model Panel {
+  id                String         @id @default(uuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  order             Int            // 패널 순서
+  prompt            String         @db.Text
+  imageUrl          String?
+  
+  // 편집 데이터 (말풍선, 텍스트 등)
+  editData          Json?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 관계
+  generation        Generation?
+  
+  @@unique([projectId, order])
+  @@index([projectId])
+  @@map("panel")
+}
+
+// AI 생성 기록
+model Generation {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projectId         String?
+  project           Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  
+  panelId           String?        @unique
+  panel             Panel?         @relation(fields: [panelId], references: [id], onDelete: SetNull)
+  
+  characterId       String?
+  character         Character?     @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  
+  // 생성 정보
+  prompt            String         @db.Text
+  negativePrompt    String?        @db.Text
+  
+  // 결과
+  imageUrl          String
+  thumbnailUrl      String?
+  
+  // 메타데이터
+  model             String         @default("gemini-2-5-flash-image-preview")
+  tokensUsed        Int            @default(2)
+  generationTime    Int?           // 밀리초
+  metadata          Json?
+  
+  createdAt         DateTime       @default(now())
+  
+  @@index([userId])
+  @@index([projectId])
+  @@map("generation")
+}
+
+// 거래 내역
+model Transaction {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type              TransactionType
+  amount            Int            // 원 단위
+  tokens            Int?           // 토큰 수량
+  
+  // 결제 정보
+  tossPaymentKey    String?
+  tossOrderId       String?
+  
+  status            TransactionStatus @default(PENDING)
+  description       String?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@map("transaction")
+}
+
+// 거래 유형 enum
+enum TransactionType {
+  SUBSCRIPTION      // 구독 결제
+  TOKEN_PURCHASE    // 토큰 구매
+  TOKEN_USAGE       // 토큰 사용
+  REFUND           // 환불
+  REFERRAL_REWARD  // 추천 보상
+}
+
+// 거래 상태 enum
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+// 추천인 보상 기록
+model ReferralReward {
+  id                String         @id @default(uuid())
+  
+  referrerId        String
+  referrer          User           @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  
+  referredId        String
+  referred          User           @relation("referred", fields: [referredId], references: [id], onDelete: Cascade)
+  
+  tokensRewarded    Int            @default(50)
+  
+  createdAt         DateTime       @default(now())
+  
+  @@unique([referrerId, referredId])
+  @@index([referrerId])
+  @@index([referredId])
+  @@map("referral_reward")
+}
+
+// 🚀 사용자별 스토리지 사용량 추적 모델
+model UserStorage {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  usedBytes         Int            @default(0) @map("used_bytes")
+  fileCount         Int            @default(0) @map("file_count")
+  maxBytes          Int            @default(1073741824) @map("max_bytes") // 기본 1GB
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  
+  @@index([userId])
+  @@index([usedBytes])
+  @@map("user_storage")
+}
+
+// 🚀 일일 사용량 집계 테이블 (성능 최적화)
+model DailyUsageStats {
+  id                String         @id @default(uuid())
+  userId            String         @map("user_id")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date              DateTime       @db.Date
+  tokensUsed        Int            @default(0) @map("tokens_used")
+  imagesGenerated   Int            @default(0) @map("images_generated")
+  charactersCreated Int            @default(0) @map("characters_created")
+  projectsCreated   Int            @default(0) @map("projects_created")
+  storageBytesAdded BigInt         @default(0) @map("storage_bytes_added")
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  
+  @@unique([userId, date], name: "daily_usage_stats_user_date_unique")
+  @@index([userId, date(sort: Desc)], name: "daily_usage_stats_user_date_idx")
+  @@index([date(sort: Desc)], name: "daily_usage_stats_date_idx")
+  @@map("daily_usage_stats")
+}
+
+// 🚀 사용자별 현재 사용량 캐시 테이블 (빠른 조회를 위한)
+model UserUsageCache {
+  id                  String         @id @default(uuid())
+  userId              String         @unique @map("user_id")
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentMonthTokens  Int            @default(0) @map("current_month_tokens")
+  currentMonthImages  Int            @default(0) @map("current_month_images")
+  totalCharacters     Int            @default(0) @map("total_characters")
+  totalProjects       Int            @default(0) @map("total_projects")
+  storageUsedBytes    BigInt         @default(0) @map("storage_used_bytes")
+  storageLimitBytes   BigInt         @default(1073741824) @map("storage_limit_bytes")
+  
+  lastCalculated      DateTime       @default(now()) @map("last_calculated")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  
+  @@index([userId], name: "user_usage_cache_user_id_idx")
+  @@index([lastCalculated(sort: Desc)], name: "user_usage_cache_last_calculated_idx")
+  @@map("user_usage_cache")
+}
+
+// 🚀 문의사항 모델 (고객 지원)
+model Inquiry {
+  id                String         @id @default(uuid())
+  userId            String?        @map("user_id")
+  user              User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  subject           String
+  message           String         @db.Text
+  category          InquiryCategory @default(general)
+  priority          InquiryPriority @default(normal)
+  status            InquiryStatus   @default(pending)
+  
+  // 관리자 응답
+  adminResponse     String?        @db.Text @map("admin_response")
+  respondedBy       String?        @map("responded_by") // 관리자 이메일
+  respondedAt       DateTime?      @map("responded_at")
+  
+  // 추가 정보
+  userEmail         String?        @map("user_email") // 사용자가 입력한 연락처
+  userAgent         String?        @map("user_agent") // 브라우저 정보
+  ipAddress         String?        @map("ip_address")
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  
+  @@index([userId], name: "inquiry_user_id_idx")
+  @@index([status], name: "inquiry_status_idx")
+  @@index([category], name: "inquiry_category_idx")
+  @@index([createdAt(sort: Desc)], name: "inquiry_created_at_idx")
+  @@map("inquiry")
+}
+
+enum InquiryCategory {
+  general     // 일반 문의
+  technical   // 기술적 문제
+  billing     // 결제 관련
+  feature     // 기능 요청
+  bug         // 버그 신고
+  account     // 계정 관련
+}
+
+enum InquiryPriority {
+  low      // 낮음
+  normal   // 보통
+  high     // 높음
+  urgent   // 긴급
+}
+
+enum InquiryStatus {
+  pending     // 대기
+  in_progress // 처리중
+  resolved    // 해결됨
+  closed      // 종료됨
+}

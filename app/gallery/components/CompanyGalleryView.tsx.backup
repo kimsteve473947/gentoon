@@ -1,0 +1,390 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, Eye, Heart, Star, TrendingUp, Users, Award } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { 
+  GallerySeries, 
+  ProjectType, 
+  CompanyGallery,
+  GallerySeriesResponse 
+} from '@/types/gallery';
+
+interface CompanyGalleryViewProps {
+  companyName: string;
+}
+
+// 회사별 브랜딩 정보
+const COMPANY_BRANDING: Record<string, {
+  name: string;
+  logo?: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+  description: string;
+  industry: string;
+}> = {
+  samsung: {
+    name: '삼성전자',
+    colors: {
+      primary: 'blue-600',
+      secondary: 'blue-100',
+      accent: 'blue-800'
+    },
+    description: '글로벌 테크놀로지 리더',
+    industry: '전자/IT'
+  },
+  lg: {
+    name: 'LG',
+    colors: {
+      primary: 'red-500',
+      secondary: 'red-100',
+      accent: 'red-700'
+    },
+    description: '라이프스 굿 브랜드',
+    industry: '전자/가전'
+  },
+  coupang: {
+    name: '쿠팡',
+    colors: {
+      primary: 'orange-500',
+      secondary: 'orange-100',
+      accent: 'orange-700'
+    },
+    description: '대한민국 1등 이커머스',
+    industry: '이커머스'
+  },
+  naver: {
+    name: '네이버',
+    colors: {
+      primary: 'green-500',
+      secondary: 'green-100',
+      accent: 'green-700'
+    },
+    description: '연결의 기술로 더 나은 세상',
+    industry: '인터넷/검색'
+  },
+  kakao: {
+    name: '카카오',
+    colors: {
+      primary: 'yellow-400',
+      secondary: 'yellow-100',
+      accent: 'yellow-600'
+    },
+    description: '기술과 사람을 연결하는 플랫폼',
+    industry: '플랫폼/메신저'
+  }
+};
+
+export default function CompanyGalleryView({ companyName }: CompanyGalleryViewProps) {
+  const router = useRouter();
+  const [series, setSeries] = useState<GallerySeries[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [companyStats, setCompanyStats] = useState<CompanyGallery | null>(null);
+  const [activeProjectType, setActiveProjectType] = useState<ProjectType | 'all'>('all');
+
+  const companyBranding = COMPANY_BRANDING[companyName.toLowerCase()] || {
+    name: companyName,
+    colors: { primary: 'gray-600', secondary: 'gray-100', accent: 'gray-800' },
+    description: '우수한 파트너 기업',
+    industry: '다양한 분야'
+  };
+
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          viewMode: 'outsourced',
+          is_outsourced: 'true',
+          client_company: companyName,
+          sort_by: 'display_order',
+          sort_order: 'asc',
+          limit: '50'
+        });
+
+        if (activeProjectType !== 'all') {
+          params.set('project_type', activeProjectType);
+        }
+
+        const response = await fetch(`/api/gallery/series?${params}`);
+        const data: GallerySeriesResponse = await response.json();
+
+        if (response.ok && data.success) {
+          setSeries(data.series || []);
+          
+          // 회사 통계 계산
+          if (data.series && data.series.length > 0) {
+            const totalProjects = data.series.length;
+            const completedProjects = data.series.filter(s => s.status === 'completed').length;
+            const ongoingProjects = totalProjects - completedProjects;
+            const totalEpisodes = data.series.reduce((sum, s) => sum + (s.view_count || 0), 0); // 임시로 view_count 사용
+            const totalViews = data.series.reduce((sum, s) => sum + s.view_count, 0);
+            const totalLikes = data.series.reduce((sum, s) => sum + s.like_count, 0);
+
+            const projectTypes = data.series.reduce((acc, s) => {
+              if (!acc.includes(s.project_type)) {
+                acc.push(s.project_type);
+              }
+              return acc;
+            }, [] as ProjectType[]);
+
+            const earliestProject = data.series.reduce((earliest, current) => 
+              new Date(current.created_at) < new Date(earliest.created_at) ? current : earliest
+            );
+
+            const latestProject = data.series.reduce((latest, current) => 
+              new Date(current.updated_at) > new Date(latest.updated_at) ? current : latest
+            );
+
+            setCompanyStats({
+              company_name: companyBranding.name,
+              total_projects: totalProjects,
+              completed_projects: completedProjects,
+              ongoing_projects: ongoingProjects,
+              total_episodes: totalEpisodes,
+              total_views: totalViews,
+              total_likes: totalLikes,
+              latest_project: latestProject,
+              featured_projects: data.series.filter(s => s.is_featured).slice(0, 3),
+              project_types: projectTypes,
+              collaboration_period: {
+                start_date: earliestProject.created_at,
+                end_date: latestProject.updated_at
+              }
+            });
+          }
+        } else {
+          console.error('Failed to fetch company data:', data.error);
+          setSeries([]);
+        }
+      } catch (error) {
+        console.error('Error fetching company data:', error);
+        setSeries([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCompanyData();
+  }, [companyName, activeProjectType]);
+
+  const projectTypeCounts = series.reduce((acc, s) => {
+    acc[s.project_type] = (acc[s.project_type] || 0) + 1;
+    return acc;
+  }, {} as Record<ProjectType, number>);
+
+  const availableProjectTypes = Object.keys(projectTypeCounts) as ProjectType[];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto px-4 py-8">
+        {/* 헤더 섹션 */}
+        <div className="mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="mb-4 text-gray-600 hover:text-gray-800"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            갤러리로 돌아가기
+          </Button>
+
+          <div className={`bg-gradient-to-r from-${companyBranding.colors.primary} to-${companyBranding.colors.accent} rounded-2xl p-8 text-white`}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="h-16 w-16 bg-white rounded-xl flex items-center justify-center">
+                    <span className="text-2xl font-bold text-gray-800">
+                      {companyBranding.name.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-1">{companyBranding.name}</h1>
+                    <p className="text-lg opacity-90">{companyBranding.description}</p>
+                    <Badge variant="secondary" className="mt-2">
+                      {companyBranding.industry}
+                    </Badge>
+                  </div>
+                </div>
+                {companyStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{companyStats.total_projects}</div>
+                      <div className="text-sm opacity-80">총 프로젝트</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{companyStats.completed_projects}</div>
+                      <div className="text-sm opacity-80">완료 프로젝트</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{companyStats.total_views.toLocaleString()}</div>
+                      <div className="text-sm opacity-80">총 조회수</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{companyStats.total_likes.toLocaleString()}</div>
+                      <div className="text-sm opacity-80">총 좋아요</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 프로젝트 타입 필터 */}
+        {availableProjectTypes.length > 0 && (
+          <div className="mb-8">
+            <Tabs value={activeProjectType} onValueChange={(value) => setActiveProjectType(value as ProjectType | 'all')}>
+              <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-auto">
+                <TabsTrigger value="all" className="flex items-center gap-2">
+                  <span>🎯</span> 전체 프로젝트 ({series.length})
+                </TabsTrigger>
+                {availableProjectTypes.map((type) => (
+                  <TabsTrigger key={type} value={type} className="flex items-center gap-2">
+                    <span>
+                      {type === 'instatoon' && '📱'}
+                      {type === 'webtoon' && '📚'}
+                      {type === 'advertisement' && '📺'}
+                      {type === 'promotional' && '🎪'}
+                      {type === 'branding' && '🏢'}
+                    </span>
+                    {type} ({projectTypeCounts[type]})
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
+        {/* 프로젝트 그리드 */}
+        {series.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {series.map((project) => (
+              <Link key={project.id} href={`/gallery/${project.id}`}>
+                <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] h-full">
+                  <div className="relative overflow-hidden rounded-t-lg">
+                    <div className="aspect-[4/5] relative">
+                      <Image
+                        src={project.thumbnail_url || project.cover_image_url}
+                        alt={project.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      />
+                    </div>
+                    {project.is_featured && (
+                      <Badge className="absolute top-2 left-2 bg-yellow-500 text-yellow-900">
+                        <Star className="h-3 w-3 mr-1" />
+                        추천작
+                      </Badge>
+                    )}
+                    <Badge 
+                      className={`absolute top-2 right-2 bg-${companyBranding.colors.primary} text-white`}
+                    >
+                      {project.project_type}
+                    </Badge>
+                  </div>
+                  
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                      {project.title}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {project.description}
+                    </p>
+                  </CardHeader>
+                  
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          {project.view_count.toLocaleString()}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Heart className="h-3 w-3" />
+                          {project.like_count.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="text-xs">
+                        {new Date(project.created_at).toLocaleDateString('ko-KR')}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1">
+                      {project.tags.slice(0, 2).map((tag, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {project.tags.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{project.tags.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">🏢</div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+              {companyBranding.name}의 프로젝트가 없습니다
+            </h3>
+            <p className="text-gray-500">
+              아직 등록된 프로젝트가 없거나 다른 필터를 시도해보세요.
+            </p>
+          </div>
+        )}
+
+        {/* 협업 기간 정보 */}
+        {companyStats && (
+          <div className="mt-12 bg-white rounded-2xl p-6 shadow-lg">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              협업 기간
+            </h3>
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">
+                {new Date(companyStats.collaboration_period.start_date).toLocaleDateString('ko-KR')}
+              </span>
+              {companyStats.collaboration_period.end_date && (
+                <>
+                  {' ~ '}
+                  <span className="font-medium">
+                    {new Date(companyStats.collaboration_period.end_date).toLocaleDateString('ko-KR')}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

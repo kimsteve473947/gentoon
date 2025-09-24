@@ -1,0 +1,762 @@
+"use client";
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Eye, Heart, Star, Clock, User, Tag, Search, Filter, X, Upload, Settings } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
+import Link from 'next/link';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  GallerySeries, 
+  GalleryFilters, 
+  GalleryViewMode, 
+  ProjectType,
+  GallerySeriesResponse 
+} from '@/types/gallery';
+
+// 기존 웹툰 카테고리
+const WEBTOON_CATEGORIES = [
+  { id: 'all', name: '전체', emoji: '📚' },
+  { id: 'romance', name: '로맨스', emoji: '💕' },
+  { id: 'fantasy', name: '판타지', emoji: '🔮' },
+  { id: 'action', name: '액션', emoji: '⚔️' },
+  { id: 'comedy', name: '코미디', emoji: '😂' },
+  { id: 'drama', name: '드라마', emoji: '🎭' },
+];
+
+// 외주 프로젝트 타입별 카테고리
+const PROJECT_TYPE_CATEGORIES = [
+  { id: 'all', name: '전체 프로젝트', emoji: '📋' },
+  { id: 'instatoon', name: '인스타툰', emoji: '📱' },
+  { id: 'advertisement', name: '광고', emoji: '📢' },
+  { id: 'promotional', name: '프로모션', emoji: '🎯' },
+  { id: 'branding', name: '브랜딩', emoji: '🏢' },
+  { id: 'webtoon', name: '웹툰', emoji: '📚' },
+];
+
+// 주요 클라이언트 회사들 (동적으로 로드 가능)
+const FEATURED_CLIENTS = [
+  { id: 'all', name: '전체 회사', emoji: '🏢' },
+  { id: 'samsung', name: '삼성전자', emoji: '📱' },
+  { id: 'lg', name: 'LG', emoji: '📺' },
+  { id: 'coupang', name: '쿠팡', emoji: '📦' },
+  { id: 'naver', name: '네이버', emoji: '🔍' },
+  { id: 'kakao', name: '카카오', emoji: '💬' },
+];
+
+// 화면 비율 옵션들
+const ASPECT_RATIOS = [
+  { id: 'all', name: '전체 비율', emoji: '📐' },
+  { id: '1:1', name: '정사각형 (1:1)', emoji: '⬜' },
+  { id: '4:5', name: '세로형 (4:5)', emoji: '📱' },
+  { id: '16:9', name: '가로형 (16:9)', emoji: '📺' },
+  { id: '9:16', name: '세로 영상 (9:16)', emoji: '📲' },
+];
+
+// 타겟 플랫폼 옵션들
+const TARGET_PLATFORMS = [
+  { id: 'all', name: '전체 플랫폼', emoji: '🌐' },
+  { id: 'instagram', name: '인스타그램', emoji: '📷' },
+  { id: 'facebook', name: '페이스북', emoji: '👥' },
+  { id: 'youtube', name: '유튜브', emoji: '📹' },
+  { id: 'tiktok', name: '틱톡', emoji: '🎵' },
+  { id: 'web', name: '웹사이트', emoji: '💻' },
+  { id: 'blog', name: '블로그', emoji: '📝' },
+];
+
+// 정렬 옵션들
+const SORT_OPTIONS = [
+  { id: 'created_at', name: '최신순', emoji: '🕒' },
+  { id: 'updated_at', name: '업데이트순', emoji: '🔄' },
+  { id: 'view_count', name: '조회수순', emoji: '👁️' },
+  { id: 'like_count', name: '좋아요순', emoji: '❤️' },
+  { id: 'display_order', name: '진열순', emoji: '📋' },
+  { id: 'title', name: '제목순', emoji: '🔤' },
+];
+
+const ADMIN_EMAIL = 'kimjh473947@gmail.com';
+
+export default function GalleryContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const [series, setSeries] = useState<GallerySeries[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'all');
+  
+  // 확장된 뷰 모드: all, featured, outsourced, internal
+  const [viewMode, setViewMode] = useState<GalleryViewMode>(
+    (searchParams.get('viewMode') as GalleryViewMode) || 'all'
+  );
+  
+  // 외주 프로젝트 전용 필터들
+  const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectType | 'all'>(
+    (searchParams.get('projectType') as ProjectType) || 'all'
+  );
+  const [clientCompanyFilter, setClientCompanyFilter] = useState(
+    searchParams.get('clientCompany') || 'all'
+  );
+  const [aspectRatioFilter, setAspectRatioFilter] = useState<AspectRatio | 'all'>(
+    (searchParams.get('aspectRatio') as AspectRatio) || 'all'
+  );
+  const [targetPlatformFilter, setTargetPlatformFilter] = useState<TargetPlatform | 'all'>(
+    (searchParams.get('targetPlatform') as TargetPlatform) || 'all'
+  );
+  const [sortBy, setSortBy] = useState<string>(
+    searchParams.get('sortBy') || 'created_at'
+  );
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+    (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc'
+  );
+  
+  const [pagination, setPagination] = useState({
+    page: 1,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+
+  const fetchSeries = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        limit: '12',
+        page: '1',
+      });
+
+      // 기존 필터들
+      if (activeCategory !== 'all') {
+        params.set('category', activeCategory);
+      }
+
+      if (searchQuery.trim()) {
+        params.set('search', searchQuery.trim());
+      }
+
+      // 새로운 뷰 모드 기반 필터링
+      switch (viewMode) {
+        case 'featured':
+          params.set('featured', 'true');
+          break;
+        case 'outsourced':
+          params.set('is_outsourced', 'true');
+          break;
+        case 'internal':
+          params.set('is_outsourced', 'false');
+          break;
+        case 'all':
+        default:
+          // 전체 보기는 추가 파라미터 없음
+          break;
+      }
+
+      // 외주 프로젝트 전용 필터들 (outsourced 모드일 때만 적용)
+      if (viewMode === 'outsourced') {
+        if (projectTypeFilter !== 'all') {
+          params.set('project_type', projectTypeFilter);
+        }
+        
+        if (clientCompanyFilter !== 'all') {
+          params.set('client_company', clientCompanyFilter);
+        }
+        
+        if (aspectRatioFilter !== 'all') {
+          params.set('aspect_ratio', aspectRatioFilter);
+        }
+        
+        if (targetPlatformFilter !== 'all') {
+          params.set('target_platform', targetPlatformFilter);
+        }
+      }
+      
+      // 정렬 옵션 (모든 모드에서 적용)
+      if (sortBy !== 'created_at') {
+        params.set('sort_by', sortBy);
+      }
+      if (sortOrder !== 'desc') {
+        params.set('sort_order', sortOrder);
+      }
+
+      const response = await fetch(`/api/gallery/series?${params}`);
+      const data: GallerySeriesResponse = await response.json();
+
+      if (response.ok && data.success) {
+        setSeries(data.series || []);
+        setPagination(data.pagination || {
+          page: 1,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        });
+      } else {
+        console.error('Failed to fetch series:', data.error || 'Unknown error');
+        setSeries([]);
+      }
+    } catch (error) {
+      console.error('Error fetching series:', error);
+      setSeries([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeCategory, viewMode, searchQuery, projectTypeFilter, clientCompanyFilter, aspectRatioFilter, targetPlatformFilter, sortBy, sortOrder]);
+
+  useEffect(() => {
+    fetchSeries();
+  }, [fetchSeries]);
+
+  useEffect(() => {
+    // 관리자 권한 확인
+    const checkAdmin = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.email === ADMIN_EMAIL) {
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.log('Admin check failed:', error);
+      }
+    };
+
+    checkAdmin();
+  }, [supabase.auth]);
+
+  useEffect(() => {
+    // URL 파라미터 업데이트
+    const params = new URLSearchParams();
+    
+    if (activeCategory !== 'all') params.set('category', activeCategory);
+    if (viewMode !== 'all') params.set('viewMode', viewMode);
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    
+    // 외주 프로젝트 전용 필터들 (outsourced 모드일 때만)
+    if (viewMode === 'outsourced') {
+      if (projectTypeFilter !== 'all') params.set('projectType', projectTypeFilter);
+      if (clientCompanyFilter !== 'all') params.set('clientCompany', clientCompanyFilter);
+      if (aspectRatioFilter !== 'all') params.set('aspectRatio', aspectRatioFilter);
+      if (targetPlatformFilter !== 'all') params.set('targetPlatform', targetPlatformFilter);
+    }
+    
+    // 정렬 옵션 (모든 모드에서)
+    if (sortBy !== 'created_at') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    
+    const newUrl = params.toString() ? `?${params}` : '';
+    router.replace(`/gallery${newUrl}`, { scroll: false });
+  }, [activeCategory, viewMode, searchQuery, projectTypeFilter, clientCompanyFilter, aspectRatioFilter, targetPlatformFilter, sortBy, sortOrder, router]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchSeries();
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
+  const handleLike = async (seriesId: string, currentLikes: number) => {
+    try {
+      const response = await fetch(`/api/gallery/series/${seriesId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'like' }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSeries(prev => 
+          prev.map(s => 
+            s.id === seriesId 
+              ? { ...s, like_count: data.like_count }
+              : s
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to like series:', error);
+    }
+  };
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="text-center mb-8">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex-1"></div>
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold text-gray-900">
+                  🎨 GenToon 갤러리
+                </h1>
+              </div>
+              <div className="flex-1 flex justify-end">
+                {isAdmin && (
+                  <Button
+                    onClick={() => router.push('/admin/gallery/upload')}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    외주 프로젝트 업로드
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              AI 기술로 제작된 고품질 웹툰과 인스타툰을 만나보세요.<br />
+              {viewMode === 'outsourced' && '🏢 GenToon이 제작한 외주 프로젝트 포트폴리오'}
+            </p>
+          </div>
+
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as GalleryViewMode)} className="w-full">
+            <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                전체작품
+              </TabsTrigger>
+              <TabsTrigger value="featured" className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                인기작품
+              </TabsTrigger>
+              <TabsTrigger value="outsourced" className="flex items-center gap-2">
+                <div className="h-4 w-4 text-purple-600">🏢</div>
+                외주포트폴리오
+              </TabsTrigger>
+              <TabsTrigger value="internal" className="flex items-center gap-2">
+                <div className="h-4 w-4 text-blue-600">🎨</div>
+                자체제작
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="space-y-6">
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="웹툰 제목, 작가, 내용으로 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-12 text-base"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Active Filters */}
+          {(searchQuery || activeCategory !== 'all' || viewMode === 'featured') && (
+            <div className="flex flex-wrap items-center gap-2 justify-center">
+              <div className="flex items-center text-sm text-gray-600 mr-2">
+                <Filter className="h-4 w-4 mr-1" />
+                활성 필터:
+              </div>
+              {searchQuery && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  검색: {searchQuery}
+                  <button onClick={clearSearch}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {activeCategory !== 'all' && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  카테고리: {CATEGORIES.find(c => c.id === activeCategory)?.name}
+                  <button onClick={() => setActiveCategory('all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {viewMode === 'featured' && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  인기작만
+                  <button onClick={() => setViewMode('all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Dynamic Category Filter based on viewMode */}
+          <div className="space-y-4">
+            {/* 기본 카테고리 필터 (일반 웹툰용) */}
+            {viewMode !== 'outsourced' && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="text-sm text-gray-600 mr-2 self-center">카테고리:</span>
+                  {WEBTOON_CATEGORIES.map((category) => (
+                    <Button
+                      key={category.id}
+                      variant={activeCategory === category.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveCategory(category.id)}
+                      className={cn(
+                        "transition-all duration-200",
+                        activeCategory === category.id 
+                          ? "bg-blue-600 hover:bg-blue-700" 
+                          : "hover:bg-gray-100"
+                      )}
+                    >
+                      <span className="mr-1">{category.emoji}</span>
+                      {category.name}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 일반 갤러리 정렬 옵션 */}
+                <div className="flex flex-wrap gap-2 justify-center items-center">
+                  <span className="text-sm text-gray-600 mr-2">정렬:</span>
+                  <div className="flex gap-2">
+                    {SORT_OPTIONS.filter(s => s.id !== 'display_order').map((sort) => (
+                      <Button
+                        key={sort.id}
+                        variant={sortBy === sort.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSortBy(sort.id)}
+                        className={cn(
+                          "transition-all duration-200",
+                          sortBy === sort.id 
+                            ? "bg-indigo-600 hover:bg-indigo-700" 
+                            : "hover:bg-gray-100"
+                        )}
+                      >
+                        <span className="mr-1">{sort.emoji}</span>
+                        {sort.name}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="ml-2"
+                  >
+                    {sortOrder === 'asc' ? '⬆️ 오름차순' : '⬇️ 내림차순'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* 외주 프로젝트 전용 필터들 */}
+            {viewMode === 'outsourced' && (
+              <div className="space-y-3">
+                {/* 프로젝트 타입 필터 */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="text-sm text-gray-600 mr-2 self-center">프로젝트 타입:</span>
+                  {PROJECT_TYPE_CATEGORIES.map((type) => (
+                    <Button
+                      key={type.id}
+                      variant={projectTypeFilter === type.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setProjectTypeFilter(type.id as ProjectType | 'all')}
+                      className={cn(
+                        "transition-all duration-200",
+                        projectTypeFilter === type.id 
+                          ? "bg-purple-600 hover:bg-purple-700" 
+                          : "hover:bg-gray-100"
+                      )}
+                    >
+                      <span className="mr-1">{type.emoji}</span>
+                      {type.name}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 클라이언트 회사 필터 */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="text-sm text-gray-600 mr-2 self-center">클라이언트:</span>
+                  {FEATURED_CLIENTS.map((client) => (
+                    <div key={client.id} className="flex gap-1">
+                      <Button
+                        variant={clientCompanyFilter === client.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setClientCompanyFilter(client.id)}
+                        className={cn(
+                          "transition-all duration-200",
+                          clientCompanyFilter === client.id 
+                            ? "bg-green-600 hover:bg-green-700" 
+                            : "hover:bg-gray-100"
+                        )}
+                      >
+                        <span className="mr-1">{client.emoji}</span>
+                        {client.name}
+                      </Button>
+                      {client.id !== 'all' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/gallery/company/${client.id}`)}
+                          className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          title={`${client.name} 전용 갤러리 보기`}
+                        >
+                          🔗
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 화면 비율 필터 */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="text-sm text-gray-600 mr-2 self-center">화면 비율:</span>
+                  {ASPECT_RATIOS.map((ratio) => (
+                    <Button
+                      key={ratio.id}
+                      variant={aspectRatioFilter === ratio.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAspectRatioFilter(ratio.id as AspectRatio | 'all')}
+                      className={cn(
+                        "transition-all duration-200",
+                        aspectRatioFilter === ratio.id 
+                          ? "bg-orange-600 hover:bg-orange-700" 
+                          : "hover:bg-gray-100"
+                      )}
+                    >
+                      <span className="mr-1">{ratio.emoji}</span>
+                      {ratio.name}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 타겟 플랫폼 필터 */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <span className="text-sm text-gray-600 mr-2 self-center">타겟 플랫폼:</span>
+                  {TARGET_PLATFORMS.map((platform) => (
+                    <Button
+                      key={platform.id}
+                      variant={targetPlatformFilter === platform.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTargetPlatformFilter(platform.id as TargetPlatform | 'all')}
+                      className={cn(
+                        "transition-all duration-200",
+                        targetPlatformFilter === platform.id 
+                          ? "bg-pink-600 hover:bg-pink-700" 
+                          : "hover:bg-gray-100"
+                      )}
+                    >
+                      <span className="mr-1">{platform.emoji}</span>
+                      {platform.name}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 정렬 옵션 */}
+                <div className="flex flex-wrap gap-2 justify-center items-center">
+                  <span className="text-sm text-gray-600 mr-2">정렬:</span>
+                  <div className="flex gap-2">
+                    {SORT_OPTIONS.map((sort) => (
+                      <Button
+                        key={sort.id}
+                        variant={sortBy === sort.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSortBy(sort.id)}
+                        className={cn(
+                          "transition-all duration-200",
+                          sortBy === sort.id 
+                            ? "bg-indigo-600 hover:bg-indigo-700" 
+                            : "hover:bg-gray-100"
+                        )}
+                      >
+                        <span className="mr-1">{sort.emoji}</span>
+                        {sort.name}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="ml-2"
+                  >
+                    {sortOrder === 'asc' ? '⬆️ 오름차순' : '⬇️ 내림차순'}
+                  </Button>
+                </div>
+
+                {/* 외주 프로젝트 통계 표시 */}
+                <div className="bg-purple-50 rounded-lg p-4 max-w-2xl mx-auto">
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-purple-800 mb-2">
+                      🏢 GenToon 외주 포트폴리오
+                    </h3>
+                    <p className="text-sm text-purple-600">
+                      다양한 기업과의 협업 프로젝트를 확인해보세요
+                    </p>
+                  </div>
+                </div>
+
+                {/* 파트너 회사 갤러리 바로가기 */}
+                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
+                  <h3 className="text-xl font-bold text-center mb-6 text-gray-800">
+                    🤝 파트너 회사별 전용 갤러리
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {FEATURED_CLIENTS.filter(client => client.id !== 'all').map((client) => (
+                      <Button
+                        key={client.id}
+                        variant="outline"
+                        onClick={() => router.push(`/gallery/company/${client.id}`)}
+                        className="h-20 flex-col gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 group"
+                      >
+                        <span className="text-2xl group-hover:scale-110 transition-transform">
+                          {client.emoji}
+                        </span>
+                        <span className="text-sm font-medium">{client.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-center text-sm text-gray-500 mt-4">
+                    클릭하면 해당 회사와의 모든 프로젝트를 한눈에 볼 수 있습니다
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Series Grid */}
+      <div className="max-w-7xl mx-auto px-4 pb-12">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <div className="aspect-[3/4] bg-gray-200 animate-pulse" />
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    <div className="h-6 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
+                    <div className="flex gap-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : series.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">📚</div>
+            <h3 className="text-2xl font-semibold text-gray-900 mb-2">작품이 없습니다</h3>
+            <p className="text-gray-600">다른 카테고리를 선택해보세요.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {series.map((item) => (
+              <Link key={item.id} href={`/gallery/${item.id}`}>
+                <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group">
+                  <div className="aspect-[3/4] relative overflow-hidden">
+                    <Image
+                      src={item.thumbnail_url || item.cover_image_url || `https://picsum.photos/400/533?random=${item.id}`}
+                      alt={item.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      priority={false}
+                    />
+                    {item.is_featured && (
+                      <Badge className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+                        <Star className="h-3 w-3 mr-1" />
+                        인기
+                      </Badge>
+                    )}
+                    {item.status === 'completed' && (
+                      <Badge variant="secondary" className="absolute top-2 right-2">
+                        완결
+                      </Badge>
+                    )}
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-bold text-lg mb-2 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                      {item.description}
+                    </p>
+                    
+                    <div className="flex items-center text-xs text-gray-500 mb-2">
+                      <User className="h-3 w-3 mr-1" />
+                      <span className="mr-3">{item.author}</span>
+                      <Clock className="h-3 w-3 mr-1" />
+                      <span>{item.status === 'ongoing' ? '연재중' : '완결'}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                      <div className="flex items-center">
+                        <Eye className="h-3 w-3 mr-1" />
+                        <span>{formatNumber(item.view_count)}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleLike(item.id, item.like_count);
+                        }}
+                        className="flex items-center hover:text-red-500 transition-colors"
+                      >
+                        <Heart className="h-3 w-3 mr-1" />
+                        <span>{formatNumber(item.like_count)}</span>
+                      </button>
+                      <div className="flex items-center">
+                        <Star className="h-3 w-3 mr-1 text-yellow-500" />
+                        <span>{item.rating}/5</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1">
+                      {item.tags.slice(0, 2).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {item.tags.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{item.tags.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

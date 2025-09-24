@@ -1,0 +1,46 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C3AED;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DB2777;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main speech bubble with rounded corners and tail -->
+  <path d="M80 60 
+           C80 40, 100 20, 120 20
+           L280 20
+           C300 20, 320 40, 320 60
+           L320 160
+           C320 180, 300 200, 280 200
+           L160 200
+           L120 240
+           L140 200
+           L120 200
+           C100 200, 80 180, 80 160
+           Z" 
+           fill="url(#logoGradient)" 
+           stroke="none"/>
+  
+  <!-- AI Text with better typography -->
+  <text x="200" y="140" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="72" 
+        font-weight="900" 
+        text-anchor="middle" 
+        fill="white"
+        letter-spacing="-2px">AI</text>
+  
+  <!-- GenToon Text -->
+  <text x="200" y="320" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="48" 
+        font-weight="700" 
+        text-anchor="middle" 
+        fill="url(#textGradient)"
+        letter-spacing="-1px">GenToon</text>
+</svg>

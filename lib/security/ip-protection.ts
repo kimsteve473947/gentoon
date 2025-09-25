@@ -134,11 +134,11 @@ export class IPProtectionSystem {
     const newRiskScore = this.calculateRiskScore(record, patterns);
     record.riskScore = newRiskScore;
 
-    // 자동 차단 결정
-    if (newRiskScore >= 8) {
+    // 자동 차단 결정 (임계값 대폭 완화)
+    if (newRiskScore >= 15) {  // 8 → 15로 완화
       record.blocked = true;
       record.blockReason = '고위험 활동 탐지';
-      record.blockUntil = now + (24 * 60 * 60 * 1000); // 24시간 차단
+      record.blockUntil = now + (1 * 60 * 60 * 1000); // 24시간 → 1시간으로 완화
       
       this.logSecurityEvent('AUTO_BLOCK_HIGH_RISK', {
         ip,
@@ -146,10 +146,10 @@ export class IPProtectionSystem {
         patterns,
         reason: record.blockReason
       });
-    } else if (newRiskScore >= 6) {
+    } else if (newRiskScore >= 12) { // 6 → 12로 완화
       record.blocked = true;
       record.blockReason = '의심스러운 활동 패턴';
-      record.blockUntil = now + (2 * 60 * 60 * 1000); // 2시간 차단
+      record.blockUntil = now + (10 * 60 * 1000); // 2시간 → 10분으로 완화
 
       this.logSecurityEvent('AUTO_BLOCK_SUSPICIOUS', {
         ip,
@@ -233,36 +233,36 @@ export class IPProtectionSystem {
   private calculateRiskScore(record: IPRecord, newPatterns: string[]): number {
     let score = record.riskScore;
 
-    // 패턴별 점수 증가
+    // 패턴별 점수 증가 (대폭 완화)
     for (const pattern of newPatterns) {
       switch (pattern) {
         case 'RAPID_REQUESTS':
-          score += 3;
+          score += 1; // 3 → 1
           break;
         case 'SUSPICIOUS_USER_AGENT':
-          score += 4;
+          score += 1; // 4 → 1
           break;
         case 'SUSPICIOUS_PATH':
-          score += 5;
+          score += 2; // 5 → 2
           break;
         case 'PROXY_VPN_DETECTED':
-          score += 3;
+          score += 1; // 3 → 1
           break;
         case 'NON_KOREA_ACCESS':
-          score += 2; // 한국 외 접근은 낮은 점수
+          score += 0; // 2 → 0 (완전 허용)
           break;
         case 'INVALID_USER_AGENT':
-          score += 2;
+          score += 0; // 2 → 0 (완전 허용)
           break;
         default:
-          score += 1;
+          score += 0; // 1 → 0
       }
     }
 
-    // 요청 빈도 기반 점수 증가
+    // 요청 빈도 기반 점수 증가 (대폭 완화)
     const requestsPerHour = record.requestCount / ((Date.now() - record.firstSeen) / (60 * 60 * 1000));
-    if (requestsPerHour > 100) score += 2;
-    if (requestsPerHour > 200) score += 3;
+    if (requestsPerHour > 500) score += 1; // 100 → 500으로 완화
+    if (requestsPerHour > 1000) score += 2; // 200 → 1000으로 완화
 
     // 최대 점수 제한
     return Math.min(10, Math.max(0, score));

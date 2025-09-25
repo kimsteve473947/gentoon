@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getPaymentHistory } from "@/lib/payments/toss-billing-supabase";
 
-// API 라우트 설정 - 최대 실행 시간을 10분으로 확장
-export const maxDuration = 600; // 초 단위
+// API 라우트 설정 - Hobby 플랜 최대값인 5분으로 설정
+export const maxDuration = 300; // 5분 (Hobby 플랜 최대값)
 
 export async function POST(request: NextRequest) {
   try {

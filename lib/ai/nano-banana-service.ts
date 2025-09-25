@@ -22,57 +22,31 @@ export class NanoBananaService {
   private genAI: GoogleGenAI;
   
   constructor() {
-    // Vertex AI 프로젝트 설정 확인
+    // Vertex AI API Key 확인 (우선)
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error("GOOGLE_AI_API_KEY is required for Vertex AI");
+    }
+    
+    // Vertex AI 프로젝트 설정
     const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
     
-    if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT_ID or GOOGLE_CLOUD_PROJECT is required for Vertex AI");
-    }
-
-    // 서비스 계정 인증 설정
-    let authOptions: any = {
+    // Vertex AI API Key 방식으로 초기화
+    this.genAI = new GoogleGenAI({
+      apiKey: apiKey,
       project: projectId,
       location: location,
-    };
-
-    // Google Application Default Credentials 설정
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-      // Vercel 환경: JSON 환경변수 사용
-      try {
-        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-        authOptions.credentials = credentials;
-        console.log('✅ Vercel 환경변수에서 Vertex AI 인증 정보 로드 성공');
-      } catch (error) {
-        console.error('❌ GOOGLE_APPLICATION_CREDENTIALS_JSON 파싱 실패:', error);
-        throw new Error('Vertex AI 인증 설정 오류');
-      }
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // 로컬 환경: 파일 직접 읽기
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        
-        if (fs.existsSync(credentialsPath)) {
-          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
-          const credentials = JSON.parse(credentialsContent);
-          authOptions.credentials = credentials;
-          console.log('✅ 로컬 파일에서 Vertex AI 인증 정보 로드 성공:', credentialsPath);
-        } else {
-          console.error('❌ 인증 파일을 찾을 수 없습니다:', credentialsPath);
-          throw new Error(`Vertex AI 인증 파일 없음: ${credentialsPath}`);
-        }
-      } catch (error) {
-        console.error('❌ 로컬 인증 파일 읽기 실패:', error);
-        throw new Error('Vertex AI 로컬 인증 설정 오류');
-      }
-    } else {
-      console.warn('⚠️ Vertex AI 인증 정보가 없습니다. API Key 방식 사용 시도...');
-    }
+    });
     
-    this.genAI = new GoogleGenAI(authOptions);
     this.webpOptimizer = new WebPOptimizer();
+    
+    console.log('✅ Vertex AI API Key로 인증 완료:', {
+      hasApiKey: !!apiKey,
+      project: projectId,
+      location: location
+    });
   }
 
   /**

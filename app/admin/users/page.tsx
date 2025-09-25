@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { PLAN_CONFIGS } from '@/lib/subscription/plan-config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -309,9 +310,8 @@ export default function AdminUsersPage() {
   const getPlanBadgeColor = (plan: string) => {
     switch (plan) {
       case 'FREE': return 'bg-gray-100 text-gray-800';
-      case 'PERSONAL': return 'bg-blue-100 text-blue-800';
-      case 'HEAVY': return 'bg-purple-100 text-purple-800';
-      case 'ENTERPRISE': return 'bg-green-100 text-green-800';
+      case 'PRO': return 'bg-blue-100 text-blue-800';
+      case 'PREMIUM': return 'bg-purple-100 text-purple-800';
       case 'ADMIN': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -418,11 +418,10 @@ export default function AdminUsersPage() {
                   className="px-3 py-2 border border-gray-300 rounded-md text-sm"
                 >
                   <option value="">모든 플랜</option>
-                  <option value="FREE">무료</option>
-                  <option value="PERSONAL">개인</option>
-                  <option value="HEAVY">헤비</option>
-                  <option value="ENTERPRISE">엔터프라이즈</option>
-                  <option value="ADMIN">관리자</option>
+                  <option value="FREE">{PLAN_CONFIGS.FREE.name}</option>
+                  <option value="PRO">{PLAN_CONFIGS.PRO.name}</option>
+                  <option value="PREMIUM">{PLAN_CONFIGS.PREMIUM.name}</option>
+                  <option value="ADMIN">{PLAN_CONFIGS.ADMIN.name}</option>
                 </select>
                 
                 <Button
@@ -1120,11 +1119,10 @@ export default function AdminUsersPage() {
                           onChange={(e) => setEditForm(prev => ({ ...prev, plan: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="FREE">무료</option>
-                          <option value="PERSONAL">개인</option>
-                          <option value="HEAVY">헤비</option>
-                          <option value="ENTERPRISE">엔터프라이즈</option>
-                          <option value="ADMIN">관리자</option>
+                          <option value="FREE">{PLAN_CONFIGS.FREE.name}</option>
+                          <option value="PRO">{PLAN_CONFIGS.PRO.name}</option>
+                          <option value="PREMIUM">{PLAN_CONFIGS.PREMIUM.name}</option>
+                          <option value="ADMIN">{PLAN_CONFIGS.ADMIN.name}</option>
                         </select>
                       </div>
                       <div>

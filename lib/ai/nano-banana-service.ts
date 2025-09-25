@@ -29,11 +29,25 @@ export class NanoBananaService {
     if (!projectId) {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID or GOOGLE_CLOUD_PROJECT is required for Vertex AI");
     }
-    
-    this.genAI = new GoogleGenAI({
+
+    // 서비스 계정 인증 설정
+    let authOptions: any = {
       project: projectId,
       location: location,
-    });
+    };
+
+    // 환경변수에서 서비스 계정 JSON 로드
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        authOptions.apiKey = undefined; // API Key 방식 비활성화
+        authOptions.credentials = credentials;
+      } catch (error) {
+        console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error);
+      }
+    }
+    
+    this.genAI = new GoogleGenAI(authOptions);
     this.webpOptimizer = new WebPOptimizer();
   }
 

@@ -37,7 +37,6 @@ export class NanoBananaService {
     };
 
     // Google Application Default Credentials 설정
-    // Vercel에서는 JSON 환경변수, 로컬에서는 파일 경로 사용
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
       // Vercel 환경: JSON 환경변수 사용
       try {
@@ -49,9 +48,25 @@ export class NanoBananaService {
         throw new Error('Vertex AI 인증 설정 오류');
       }
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // 로컬 환경: 파일 경로 사용
-      console.log('✅ 로컬 환경에서 GOOGLE_APPLICATION_CREDENTIALS 파일 사용:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      // GoogleGenAI SDK가 자동으로 파일을 로드함
+      // 로컬 환경: 파일 직접 읽기
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        
+        if (fs.existsSync(credentialsPath)) {
+          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
+          const credentials = JSON.parse(credentialsContent);
+          authOptions.credentials = credentials;
+          console.log('✅ 로컬 파일에서 Vertex AI 인증 정보 로드 성공:', credentialsPath);
+        } else {
+          console.error('❌ 인증 파일을 찾을 수 없습니다:', credentialsPath);
+          throw new Error(`Vertex AI 인증 파일 없음: ${credentialsPath}`);
+        }
+      } catch (error) {
+        console.error('❌ 로컬 인증 파일 읽기 실패:', error);
+        throw new Error('Vertex AI 로컬 인증 설정 오류');
+      }
     } else {
       console.warn('⚠️ Vertex AI 인증 정보가 없습니다. API Key 방식 사용 시도...');
     }

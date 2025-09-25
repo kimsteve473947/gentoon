@@ -22,9 +22,9 @@ export class NanoBananaService {
   private genAI: GoogleGenAI;
   
   constructor() {
-    // Vertex AI 프로젝트 설정
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
-    const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+    // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
+    const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.trim();
+    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.trim();
     
     if (!projectId) {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
@@ -55,10 +55,19 @@ export class NanoBananaService {
     // Vercel 환경에서 JSON 환경변수 사용
     if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
       try {
-        credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        // Vercel 환경변수에서 발생할 수 있는 개행문자 제거
+        const cleanJsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
+        credentials = JSON.parse(cleanJsonString);
+        
+        // private_key에서 \\n을 실제 개행으로 변환
+        if (credentials.private_key) {
+          credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+        }
+        
         console.log('✅ Vercel 환경변수에서 credentials 로드 성공');
       } catch (error) {
         console.error('❌ Vercel credentials JSON 파싱 실패:', error);
+        console.error('JSON 문자열 길이:', process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON?.length);
       }
     }
     

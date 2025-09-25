@@ -36,15 +36,24 @@ export class NanoBananaService {
       location: location,
     };
 
-    // 환경변수에서 서비스 계정 JSON 로드
+    // Google Application Default Credentials 설정
+    // Vercel에서는 JSON 환경변수, 로컬에서는 파일 경로 사용
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      // Vercel 환경: JSON 환경변수 사용
       try {
         const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-        authOptions.apiKey = undefined; // API Key 방식 비활성화
         authOptions.credentials = credentials;
+        console.log('✅ Vercel 환경변수에서 Vertex AI 인증 정보 로드 성공');
       } catch (error) {
-        console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error);
+        console.error('❌ GOOGLE_APPLICATION_CREDENTIALS_JSON 파싱 실패:', error);
+        throw new Error('Vertex AI 인증 설정 오류');
       }
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      // 로컬 환경: 파일 경로 사용
+      console.log('✅ 로컬 환경에서 GOOGLE_APPLICATION_CREDENTIALS 파일 사용:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      // GoogleGenAI SDK가 자동으로 파일을 로드함
+    } else {
+      console.warn('⚠️ Vertex AI 인증 정보가 없습니다. API Key 방식 사용 시도...');
     }
     
     this.genAI = new GoogleGenAI(authOptions);

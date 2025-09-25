@@ -2,6 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import { generateOptimizedPrompt, getRecommendedDimensions, type AspectRatio } from './prompt-templates';
 import { WebPOptimizer } from '@/lib/image/webp-optimizer';
 import { createClient } from '@/lib/supabase/server';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 // Gemini 토큰 비용 정보 (token-manager.ts와 일치)
 const GEMINI_COST = {
@@ -20,6 +23,7 @@ const GEMINI_COST = {
 export class NanoBananaService {
   private webpOptimizer: WebPOptimizer;
   private genAI: GoogleGenAI;
+  private tempCredentialFile: string | null = null;
   
   constructor() {
     // Vertex AI 프로젝트 설정
@@ -30,35 +34,15 @@ export class NanoBananaService {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
     }
 
-    // 서비스 계정 credentials 직접 로드
+    // 서비스 계정 credentials JSON 환경변수에서 로드
     let credentials = null;
     
-    // 로컬 환경에서 파일 직접 읽기
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      try {
-        const fs = require('fs');
-        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        console.log('🔑 로컬 credentials 파일 로드 시도:', credentialsPath);
-        
-        if (fs.existsSync(credentialsPath)) {
-          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
-          credentials = JSON.parse(credentialsContent);
-          console.log('✅ Vertex AI credentials 로드 성공');
-        } else {
-          console.error('❌ Credentials 파일 없음:', credentialsPath);
-        }
-      } catch (error) {
-        console.error('❌ Credentials 파일 읽기 실패:', error);
-      }
-    }
-    
-    // Vercel 환경에서 JSON 환경변수 사용
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
       try {
         credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-        console.log('✅ Vercel 환경변수에서 credentials 로드 성공');
+        console.log('✅ JSON 환경변수에서 credentials 로드 성공');
       } catch (error) {
-        console.error('❌ Vercel credentials JSON 파싱 실패:', error);
+        console.error('❌ JSON credentials 파싱 실패:', error);
       }
     }
     
@@ -66,11 +50,14 @@ export class NanoBananaService {
       throw new Error("Vertex AI credentials를 찾을 수 없습니다");
     }
     
-    // Vertex AI 방식으로 초기화
+    // 임시 credential 파일 생성 (메모리 내에서만 사용)
+    this.setupTemporaryCredentialFile(credentials);
+    
+    // Vertex AI 방식으로 초기화 (공식 문서 방식)
     this.genAI = new GoogleGenAI({
+      vertexai: true,
       project: projectId,
-      location: location,
-      credentials: credentials
+      location: location
     });
     
     this.webpOptimizer = new WebPOptimizer();
@@ -78,8 +65,64 @@ export class NanoBananaService {
     console.log('✅ Vertex AI 초기화 완료:', {
       project: projectId,
       location: location,
-      hasCredentials: !!credentials
+      hasCredentials: !!credentials,
+      tempCredFile: !!this.tempCredentialFile
     });
+  }
+
+  /**
+   * 임시 credential 파일 설정 (메모리 내에서만 사용)
+   */
+  private setupTemporaryCredentialFile(credentials: any): void {
+    try {
+      // 임시 디렉토리에 고유한 파일명으로 생성
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substring(2);
+      this.tempCredentialFile = join(tmpdir(), `vertex-ai-creds-${timestamp}-${randomSuffix}.json`);
+      
+      // credential 파일 작성
+      writeFileSync(this.tempCredentialFile, JSON.stringify(credentials, null, 2));
+      
+      // 환경변수 설정
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = this.tempCredentialFile;
+      
+      console.log('✅ 임시 credential 파일 생성 완료:', this.tempCredentialFile);
+      
+      // 프로세스 종료 시 정리를 위한 이벤트 핸들러
+      process.on('exit', () => this.cleanup());
+      process.on('SIGINT', () => {
+        this.cleanup();
+        process.exit(0);
+      });
+      process.on('SIGTERM', () => {
+        this.cleanup();
+        process.exit(0);
+      });
+      
+    } catch (error) {
+      console.error('❌ 임시 credential 파일 생성 실패:', error);
+      throw new Error(`임시 credential 파일 생성 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  }
+
+  /**
+   * 임시 파일 및 환경변수 정리
+   */
+  private cleanup(): void {
+    if (this.tempCredentialFile && existsSync(this.tempCredentialFile)) {
+      try {
+        unlinkSync(this.tempCredentialFile);
+        console.log('✅ 임시 credential 파일 삭제 완료');
+      } catch (error) {
+        console.warn('⚠️ 임시 credential 파일 삭제 실패:', error);
+      }
+      this.tempCredentialFile = null;
+    }
+    
+    // 환경변수 정리 (다른 서비스에 영향 주지 않도록)
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS?.includes('vertex-ai-creds-')) {
+      delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
   }
 
   /**

@@ -5,7 +5,7 @@ import { canUploadFile } from "@/lib/storage/storage-manager";
 import { webpOptimizer } from "@/lib/image/webp-optimizer";
 import { SecureLogger } from "@/lib/utils/secure-logger";
 import { getPlanConfig } from "@/lib/subscription/plan-config";
-import { prisma } from "@/lib/db/prisma";
+// import { prisma } from "@/lib/db/prisma"; // Temporarily disabled due to DB connection issues
 
 // 요소 목록 조회
 export async function GET(request: NextRequest) {
@@ -39,9 +39,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 구독 정보 조회하여 제한 정보 포함
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: user.id }
-    });
+    const { data: subscription } = await supabase
+      .from('subscription')
+      .select('plan')
+      .eq('userId', user.id)
+      .single();
     
     const planType = subscription?.plan || 'FREE';
     const planConfig = getPlanConfig(planType);
@@ -129,9 +131,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 사용자 구독 정보 및 현재 요소 개수 확인
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: userData.id }
-    });
+    const { data: subscription } = await supabase
+      .from('subscription')
+      .select('plan')
+      .eq('userId', userData.id)
+      .single();
     
     const { count } = await supabase
       .from('element')

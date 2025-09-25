@@ -22,30 +22,63 @@ export class NanoBananaService {
   private genAI: GoogleGenAI;
   
   constructor() {
-    // Vertex AI API Key 확인 (우선)
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
-    
-    if (!apiKey) {
-      throw new Error("GOOGLE_AI_API_KEY is required for Vertex AI");
-    }
-    
     // Vertex AI 프로젝트 설정
     const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
     
-    // Vertex AI API Key 방식으로 초기화
+    if (!projectId) {
+      throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
+    }
+
+    // 서비스 계정 credentials 직접 로드
+    let credentials = null;
+    
+    // 로컬 환경에서 파일 직접 읽기
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      try {
+        const fs = require('fs');
+        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        console.log('🔑 로컬 credentials 파일 로드 시도:', credentialsPath);
+        
+        if (fs.existsSync(credentialsPath)) {
+          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
+          credentials = JSON.parse(credentialsContent);
+          console.log('✅ Vertex AI credentials 로드 성공');
+        } else {
+          console.error('❌ Credentials 파일 없음:', credentialsPath);
+        }
+      } catch (error) {
+        console.error('❌ Credentials 파일 읽기 실패:', error);
+      }
+    }
+    
+    // Vercel 환경에서 JSON 환경변수 사용
+    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        console.log('✅ Vercel 환경변수에서 credentials 로드 성공');
+      } catch (error) {
+        console.error('❌ Vercel credentials JSON 파싱 실패:', error);
+      }
+    }
+    
+    if (!credentials) {
+      throw new Error("Vertex AI credentials를 찾을 수 없습니다");
+    }
+    
+    // Vertex AI 방식으로 초기화
     this.genAI = new GoogleGenAI({
-      apiKey: apiKey,
       project: projectId,
       location: location,
+      credentials: credentials
     });
     
     this.webpOptimizer = new WebPOptimizer();
     
-    console.log('✅ Vertex AI API Key로 인증 완료:', {
-      hasApiKey: !!apiKey,
+    console.log('✅ Vertex AI 초기화 완료:', {
       project: projectId,
-      location: location
+      location: location,
+      hasCredentials: !!credentials
     });
   }
 

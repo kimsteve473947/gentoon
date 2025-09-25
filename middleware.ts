@@ -128,8 +128,13 @@ async function performSecurityCheck(
     return { allowed: true };
   }
 
-  // 개발 모드에서는 보안 완화 (API 요청만 기본 검사)
+  // 개발 모드 또는 IP 보호 비활성화 시 보안 완화
   if (isDevelopmentMode() && !pathname.startsWith('/api/')) {
+    return { allowed: true };
+  }
+
+  // IP 보호 시스템 비활성화 체크
+  if (process.env.ENABLE_IP_PROTECTION === 'false') {
     return { allowed: true };
   }
 

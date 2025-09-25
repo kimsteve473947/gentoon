@@ -159,6 +159,24 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       // 저장 실패해도 이미지 생성은 성공했으므로 계속 진행
     } else {
       console.log('💾 생성 기록 저장 완료:', savedGeneration.id);
+      
+      // 🔗 패널의 generationId 연결
+      if (panelId && savedGeneration?.id) {
+        const { error: updateError } = await supabase
+          .from('panel')
+          .update({
+            generationId: savedGeneration.id,
+            imageUrl: result.imageUrl,
+            updatedAt: new Date().toISOString()
+          })
+          .eq('id', panelId);
+        
+        if (updateError) {
+          console.error('❌ 패널 업데이트 실패:', updateError);
+        } else {
+          console.log('✅ 패널 연결 완료:', panelId, '→', savedGeneration.id);
+        }
+      }
     }
 
     // 🚀 사용량 캐시 업데이트 - 이미지 생성

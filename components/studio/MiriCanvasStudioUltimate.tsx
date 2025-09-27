@@ -55,12 +55,18 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  AlignJustify
+  AlignJustify,
+  Heart,
+  ChevronDown,
+  ArrowUpDown,
+  ChevronRight,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BUBBLE_TEMPLATES } from './BubbleTemplates';
 import { BubbleTemplateRenderer } from './BubbleTemplateRenderer';
 import { OptimizedImage } from './OptimizedImage';
+import { OptimizedCanvasImage } from './OptimizedCanvasImage';
 import { VirtualizedTemplateList } from './VirtualizedTemplateList';
 import { CharacterAndElementSelector } from './CharacterAndElementSelector';
 import { AddCharacterModal } from './AddCharacterModal';
@@ -70,20 +76,15 @@ import { useHistory, useBatchHistory } from '@/hooks/useHistory';
 import { enhancePromptWithElements, getElementImageUrls } from '@/lib/ai/element-manager';
 import { calculateRotatedResize } from './RotationAwareResize';
 import { createBrowserClient } from '@supabase/ssr';
+import { FontSelector } from '@/components/studio/FontSelector';
+import { STUDIO_FONTS, NOONNU_FONTS } from '@/lib/fonts/noonnu-fonts';
+import { FontVariant } from '@/hooks/useFonts';
 
-// 🎨 상업적 이용 허용된 폰트 목록 (웹툰 제작에 적합)
-const AVAILABLE_FONTS = [
-  { id: 'noto-sans', name: '본고딕 (Noto Sans)', fontFamily: '"Noto Sans KR", sans-serif', webFont: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap' },
-  { id: 'noto-serif', name: '노토 명조 (Noto Serif)', fontFamily: '"Noto Serif KR", serif', webFont: 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap' },
-  { id: 'nanum-gothic', name: '나눔고딕', fontFamily: '"Nanum Gothic", sans-serif', webFont: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap' },
-  { id: 'nanum-pen', name: '나눔펜스크립트', fontFamily: '"Nanum Pen Script", cursive', webFont: 'https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap' },
-  { id: 'black-han-sans', name: '검은고딕', fontFamily: '"Black Han Sans", sans-serif', webFont: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' },
-  { id: 'jua', name: '주아체', fontFamily: '"Jua", sans-serif', webFont: 'https://fonts.googleapis.com/css2?family=Jua&display=swap' },
-  { id: 'dokdo', name: '독도체', fontFamily: '"Dokdo", cursive', webFont: 'https://fonts.googleapis.com/css2?family=Dokdo&display=swap' },
-  { id: 'cute-font', name: '큐트폰트', fontFamily: '"Cute Font", cursive', webFont: 'https://fonts.googleapis.com/css2?family=Cute+Font&display=swap' },
-  { id: 'gaegu', name: '개구체', fontFamily: '"Gaegu", cursive', webFont: 'https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&display=swap' },
-  { id: 'gamja-flower', name: '감자꽃체', fontFamily: '"Gamja Flower", cursive', webFont: 'https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap' }
-];
+// Google Fonts CSS 로드용
+const GOOGLE_FONTS_CSS = [
+  'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap'
+].join('|');
 
 // 캔버스 크기 정의 (최적화된 치수)
 const CANVAS_SIZES = {
@@ -112,6 +113,7 @@ interface CanvasElement {
   height: number;
   fontSize?: number; // 텍스트만 사용
   fontFamily?: string; // 텍스트만 사용
+  fontWeight?: number; // 텍스트 글꼴 두께 (100-900)
   color?: string; // 텍스트만 사용
   bubbleStyle?: 'speech' | 'thought' | 'shout' | 'whisper';
   templateId?: string; // 말풍선 템플릿 ID
@@ -247,6 +249,19 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   
   // UI 상태
   const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [expandedFonts, setExpandedFonts] = useState<Set<string>>(new Set());
+  const [favoriteFonts, setFavoriteFonts] = useState<Set<string>>(new Set());
+
+  // 폰트 변경 핸들러 (새로운 FontSelector용)
+  const handleFontChange = useCallback((fontFamily: string, fontWeight: number) => {
+    if (selectedElementId) {
+      updateElementProperty(selectedElementId, {
+        fontFamily,
+        fontWeight: fontWeight.toString(), // Konva는 문자열로 받아야 함
+        fontStyle: fontWeight >= 700 ? 'bold' : 'normal'
+      });
+    }
+  }, [selectedElementId]);
   
   // 멘션용 캐릭터와 요소 데이터
   const [mentionCharacters, setMentionCharacters] = useState<any[]>([]);
@@ -263,6 +278,21 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  
+  // 정렬 상태 (2열 그리드 유지)
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest');
+  
+  // 삭제 확인 다이얼로그 상태
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, imageId: string, imageName: string}>({
+    isOpen: false,
+    imageId: '',
+    imageName: ''
+  });
+  
+  // 배치 생성 상태
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [pendingScript, setPendingScript] = useState<ScriptPanel[]>([]);
   
   
   // 멀티 선택을 위한 상태
@@ -288,16 +318,25 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   // 🎯 실제 사용할 cuts (항상 원본 데이터 사용)
   const cuts = historyCuts;
 
-  // 🎨 Google Fonts 동적 로드
+  // 🎨 웹폰트 동적 로드 (Google Fonts + Noonnu Fonts)
   useEffect(() => {
     const loadedFonts = new Set<string>();
     
-    AVAILABLE_FONTS.forEach(font => {
+    // Google Fonts 로드
+    if (!loadedFonts.has('google-fonts')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = GOOGLE_FONTS_CSS;
+      document.head.appendChild(link);
+      loadedFonts.add('google-fonts');
+    }
+    
+    // Noonnu Fonts CSS 로드
+    NOONNU_FONTS.forEach(font => {
       if (!loadedFonts.has(font.id)) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = font.webFont;
-        document.head.appendChild(link);
+        const style = document.createElement('style');
+        style.textContent = font.cssCode;
+        document.head.appendChild(style);
         loadedFonts.add(font.id);
       }
     });
@@ -322,6 +361,48 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFontDropdown]);
+
+  // 💗 찜한 폰트 localStorage에서 로드
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('gentoon-favorite-fonts');
+    if (savedFavorites) {
+      try {
+        const favorites = JSON.parse(savedFavorites);
+        setFavoriteFonts(new Set(favorites));
+      } catch (error) {
+        console.error('찜한 폰트 로드 실패:', error);
+      }
+    }
+  }, []);
+
+  // 💗 찜한 폰트 localStorage에 저장
+  const toggleFavoriteFont = useCallback((fontId: string) => {
+    setFavoriteFonts(prev => {
+      const newFavorites = new Set(prev);
+      if (newFavorites.has(fontId)) {
+        newFavorites.delete(fontId);
+      } else {
+        newFavorites.add(fontId);
+      }
+      
+      // localStorage에 저장
+      localStorage.setItem('gentoon-favorite-fonts', JSON.stringify([...newFavorites]));
+      return newFavorites;
+    });
+  }, []);
+
+  // 🔽 폰트 확장/축소 토글
+  const toggleFontExpanded = useCallback((fontId: string) => {
+    setExpandedFonts(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(fontId)) {
+        newExpanded.delete(fontId);
+      } else {
+        newExpanded.add(fontId);
+      }
+      return newExpanded;
+    });
+  }, []);
 
   // ✏️ 인라인 텍스트 편집 함수들
   const startTextEditing = useCallback((elementId: string, currentText: string, event?: React.MouseEvent) => {
@@ -647,6 +728,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   const [selectedPanelCount, setSelectedPanelCount] = useState<'4-5' | '6-8' | '9-10'>('4-5');
   const [scriptCharacters, setScriptCharacters] = useState<any[]>([]);
   const [selectedScriptCharacters, setSelectedScriptCharacters] = useState<string[]>([]);
+  const [scriptElements, setScriptElements] = useState<any[]>([]);
+  const [selectedScriptElements, setSelectedScriptElements] = useState<string[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [generatedScript, setGeneratedScript] = useState<any[]>([]);
   const [scriptCopiedIndex, setScriptCopiedIndex] = useState<number | null>(null);
@@ -935,18 +1018,107 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   // 디버깅용 로그
   useEffect(() => {
   }, [selectedCharacters]);
+
+  // AI 대본 생성 완료 시 처리 함수
+  const handleScriptGenerated = useCallback((panels: ScriptPanel[]) => {
+    console.log('🎬 handleScriptGenerated 호출됨!');
+    console.log('🎬 AI 대본 생성 완료, 캐릭터 자동 매핑 시작:', panels);
+    
+    // 기존 컷들을 새 대본으로 교체
+    const newCuts: WebtoonCut[] = panels.map((panel, index) => ({
+      id: String(index + 1),
+      prompt: panel.prompt,
+      elements: [],
+      imageUrl: undefined,
+      generationId: undefined
+      // 🚫 isGenerating 제거 - 별도 상태로 관리
+    }));
+
+    updateHistory({ 
+      cuts: newCuts,
+      selectedCutId: newCuts.length > 0 ? newCuts[0].id : '1'
+    });
+    
+    // 🎭 AI 대본 기반 캐릭터 자동 매핑 실행
+    const loadCharactersAndMap = async () => {
+      try {
+        console.log('📚 캐릭터 데이터 로딩 중...');
+        const response = await fetch('/api/uploads');
+        const uploadData = await response.json();
+        
+        if (uploadData.success) {
+          const availableCharacters = uploadData.uploads || [];
+          console.log('✅ 사용 가능한 캐릭터:', availableCharacters.length, '개');
+          console.log('🔍 Panels data for mapping:', panels);
+          
+          // 패널별 캐릭터 매핑 실행
+          const characterMap = mapPanelCharacters(panels, availableCharacters);
+          
+          console.log('🗺️ Generated character map:', characterMap);
+          
+          // 약간의 지연 후 첫 번째 패널의 캐릭터로 초기 선택 설정
+          setTimeout(() => {
+            if (characterMap.size > 0) {
+              const firstPanelCharacters = characterMap.get(0);
+              if (firstPanelCharacters && firstPanelCharacters.length > 0) {
+                console.log('🎯 첫 번째 패널 캐릭터로 초기 선택:', firstPanelCharacters);
+                setSelectedCharacters(firstPanelCharacters);
+              }
+            }
+          }, 100); // 100ms 지연으로 상태 업데이트 순서 보장
+          
+        } else {
+          console.warn('⚠️ 캐릭터 데이터 로딩 실패:', uploadData.error);
+        }
+      } catch (error) {
+        console.error('❌ 캐릭터 매핑 중 오류:', error);
+      }
+    };
+    
+    // 비동기로 캐릭터 매핑 실행
+    loadCharactersAndMap();
+
+    setHasUnsavedChanges(true);
+    setShowAIScriptModal(false);
+  }, [updateHistory, mapPanelCharacters]);
+
   const [addCharacterModalOpen, setAddCharacterModalOpen] = useState(false);
   const [characterRefreshKey, setCharacterRefreshKey] = useState(0);
   
-  // AI 대본용 캐릭터 로딩
+  // AI 대본용 캐릭터 및 요소 로딩
   useEffect(() => {
     loadScriptCharacters();
+    loadScriptElements();
   }, [characterRefreshKey]);
 
   // 업로드된 파일 목록 로딩
   useEffect(() => {
     loadUploadedFiles();
   }, []);
+
+  // 정렬된 업로드 이미지 목록
+  const sortedUploadedImages = useMemo(() => {
+    const sorted = [...uploadedImages];
+    
+    switch (sortOrder) {
+      case 'newest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA; // 최신순
+        });
+      case 'oldest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateA - dateB; // 오래된순
+        });
+      case 'name':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name)); // 이름순
+      default:
+        return sorted;
+    }
+  }, [uploadedImages, sortOrder]);
 
   const loadScriptCharacters = async () => {
     try {
@@ -970,6 +1142,31 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       setScriptCharacters(charactersData || []);
     } catch (error) {
       console.error('대본용 캐릭터 로딩 실패:', error);
+    }
+  };
+
+  const loadScriptElements = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('user')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData) return;
+
+      const { data: elementsData } = await supabase
+        .from('element')
+        .select('id, name, description, category, thumbnailUrl')
+        .eq('userId', userData.id)
+        .order('createdAt', { ascending: false });
+
+      setScriptElements(elementsData || []);
+    } catch (error) {
+      console.error('대본용 요소 로딩 실패:', error);
     }
   };
   
@@ -1106,15 +1303,16 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
 
         if (hasImageChanges) {
           console.log('🔄 다른 세션에서 생성된 이미지 동기화');
-          setCuts(currentCuts => 
-            currentCuts.map((localCut, index) => {
+          pushHistory(prev => ({
+            ...prev,
+            cuts: prev.cuts.map((localCut, index) => {
               const dbCut = dbCuts[index];
               if (dbCut && dbCut.imageUrl && dbCut.imageUrl !== localCut.imageUrl) {
                 return { ...localCut, imageUrl: dbCut.imageUrl, generationId: dbCut.generationId };
               }
               return localCut;
             })
-          );
+          }));
         }
 
       } catch (error) {
@@ -1970,6 +2168,14 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     );
   };
 
+  const handleScriptElementToggle = (elementId: string) => {
+    setSelectedScriptElements(prev => 
+      prev.includes(elementId)
+        ? prev.filter(id => id !== elementId)
+        : [...prev, elementId]
+    );
+  };
+
   const generateScript = async () => {
     if (!storyPrompt.trim()) {
       alert('스토리 아이디어를 입력해주세요');
@@ -1984,6 +2190,11 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
         return char?.name || '';
       }).filter(Boolean);
 
+      const elementNames = selectedScriptElements.map(id => {
+        const element = scriptElements.find(e => e.id === id);
+        return element ? `${element.name} (${element.description})` : '';
+      }).filter(Boolean);
+
       const panelCount = selectedPanelCount === '4-5' ? 4 : 
                         selectedPanelCount === '6-8' ? 7 : 10;
 
@@ -1995,6 +2206,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
         body: JSON.stringify({
           storyPrompt: storyPrompt.trim(),
           characterNames,
+          elementNames,
           panelCount,
           style: 'webtoon'
         })
@@ -2058,69 +2270,198 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     order: number;
     prompt: string;
     characters: string[];
+    elements: string[];
   }
 
-  const handleScriptGenerated = (panels: ScriptPanel[]) => {
-    console.log('🎬 handleScriptGenerated 호출됨!');
-    console.log('🎬 AI 대본 생성 완료, 캐릭터 자동 매핑 시작:', panels);
+  // 패널에 적용하기 (기존 방식 + 캐릭터/요소 자동 선택)
+  const handleApplyToCanvas = useCallback(async (panels: ScriptPanel[]) => {
+    console.log('📋 패널에 적용하기:', panels);
     
-    // 기존 컷들을 새 대본으로 교체
-    const newCuts: WebtoonCut[] = panels.map((panel, index) => ({
-      id: String(index + 1),
-      prompt: panel.prompt,
-      elements: [],
-      imageUrl: undefined,
-      generationId: undefined
-      // 🚫 isGenerating 제거 - 별도 상태로 관리
-    }));
-
-    updateHistory({ 
-      cuts: newCuts,
-      selectedCutId: newCuts.length > 0 ? newCuts[0].id : '1'
-    });
-    
-    // 🎭 AI 대본 기반 캐릭터 자동 매핑 실행
-    const loadCharactersAndMap = async () => {
-      try {
-        console.log('📚 캐릭터 데이터 로딩 중...');
-        const response = await fetch('/api/uploads');
-        const uploadData = await response.json();
+    try {
+      // 먼저 대본을 캔버스에 적용
+      handleScriptGenerated(panels);
+      
+      // 현재 선택된 컷의 캐릭터와 요소를 자동 선택
+      const currentCutIndex = parseInt(selectedCutId) - 1;
+      const currentPanel = panels[currentCutIndex];
+      
+      if (currentPanel) {
+        console.log('🎯 현재 컷의 자동 선택 시작:', {
+          cutIndex: currentCutIndex,
+          characters: currentPanel.characters,
+          elements: currentPanel.elements
+        });
         
-        if (uploadData.success) {
-          const availableCharacters = uploadData.uploads || [];
-          console.log('✅ 사용 가능한 캐릭터:', availableCharacters.length, '개');
-          console.log('🔍 Panels data for mapping:', panels);
-          
-          // 패널별 캐릭터 매핑 실행
-          const characterMap = mapPanelCharacters(panels, availableCharacters);
-          
-          console.log('🗺️ Generated character map:', characterMap);
-          
-          // 약간의 지연 후 첫 번째 패널의 캐릭터로 초기 선택 설정
-          setTimeout(() => {
-            if (characterMap.size > 0) {
-              const firstPanelCharacters = characterMap.get(0);
-              if (firstPanelCharacters && firstPanelCharacters.length > 0) {
-                console.log('🎯 첫 번째 패널 캐릭터로 초기 선택:', firstPanelCharacters);
-                setSelectedCharacters(firstPanelCharacters);
-              }
-            }
-          }, 100); // 100ms 지연으로 상태 업데이트 순서 보장
-          
-        } else {
-          console.warn('⚠️ 캐릭터 데이터 로딩 실패:', uploadData.error);
-        }
-      } catch (error) {
-        console.error('❌ 캐릭터 매핑 중 오류:', error);
-      }
-    };
-    
-    // 비동기로 캐릭터 매핑 실행
-    loadCharactersAndMap();
+        // 사용자의 캐릭터와 요소 정보 조회
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const [charactersResult, elementsResult] = await Promise.all([
+            supabase
+              .from('character')
+              .select('id, name, description, thumbnailUrl, squareRatioUrl, portraitRatioUrl')
+              .eq('userId', user.id),
+            supabase
+              .from('element')
+              .select('id, name, description, category, thumbnailUrl')
+              .eq('userId', user.id)
+          ]);
 
-    setHasUnsavedChanges(true);
-    setShowAIScriptModal(false);
-  };
+          const userCharacters = charactersResult.data || [];
+          const userElements = elementsResult.data || [];
+
+          // 대본의 캐릭터 이름으로 ID 찾기
+          const matchedCharacterIds = currentPanel.characters
+            .map(charName => {
+              const character = userCharacters.find(c => 
+                c.name === charName || 
+                c.name.includes(charName) || 
+                charName.includes(c.name)
+              );
+              return character?.id;
+            })
+            .filter(Boolean);
+
+          // 대본의 요소 이름으로 요소 객체 찾기  
+          const matchedElements = currentPanel.elements
+            .map(elementName => {
+              // 요소 이름에서 설명 부분 제거 (예: "마법 지팡이 (강력한 마법 무기)" -> "마법 지팡이")
+              const cleanElementName = elementName.split(' (')[0];
+              const element = userElements.find(e => 
+                e.name === cleanElementName || 
+                e.name.includes(cleanElementName) || 
+                cleanElementName.includes(e.name)
+              );
+              
+              if (element) {
+                return {
+                  id: element.id,
+                  name: element.name,
+                  description: element.description,
+                  category: element.category,
+                  thumbnailUrl: element.thumbnailUrl,
+                  isSelected: true
+                };
+              }
+              return null;
+            })
+            .filter(Boolean);
+
+          console.log('🔍 매칭 결과:', {
+            matchedCharacterIds,
+            matchedElements: matchedElements.map(e => e?.name)
+          });
+
+          // 캐릭터 자동 선택
+          if (matchedCharacterIds.length > 0) {
+            setSelectedCharacters(matchedCharacterIds);
+            console.log('✅ 캐릭터 자동 선택 완료:', matchedCharacterIds);
+          }
+
+          // 요소 자동 선택
+          if (matchedElements.length > 0) {
+            setSelectedElements(matchedElements);
+            console.log('✅ 요소 자동 선택 완료:', matchedElements.map(e => e?.name));
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ 패널 적용 중 오류:', error);
+      // 에러가 발생해도 대본은 적용되도록 함
+    }
+  }, [selectedCutId, handleScriptGenerated, supabase]);
+
+  // 한꺼번에 생성하기 (배치 생성)
+  const handleBatchGeneration = useCallback(async (panels: ScriptPanel[]) => {
+    console.log('🚀 배치 생성 시작:', panels);
+    
+    try {
+      setIsBatchGenerating(true);
+      setBatchProgress({ current: 0, total: panels.length });
+      setPendingScript(panels);
+
+      // 먼저 대본을 캔버스에 적용
+      handleScriptGenerated(panels);
+
+      // 배치 생성 API 호출
+      const response = await fetch('/api/ai/generate-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          panels,
+          canvasRatio: canvasRatio,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '배치 생성 실패');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('🎉 배치 생성 완료:', result.generatedImages);
+        
+        // 생성된 이미지들을 각 패널에 순차적으로 적용
+        for (let i = 0; i < result.generatedImages.length; i++) {
+          const imageData = result.generatedImages[i];
+          const cutId = String(imageData.order);
+          
+          setBatchProgress({ current: i + 1, total: panels.length });
+          
+          // 해당 컷에 배경 이미지로 추가
+          const newElement: CanvasElement = {
+            id: `bg-${Date.now()}-${i}`,
+            type: 'image',
+            x: 0,
+            y: 0,
+            width: canvasRatio === '1:1' ? 1024 : 896,
+            height: canvasRatio === '1:1' ? 1024 : 1115,
+            rotation: 0,
+            imageUrl: imageData.imageUrl,
+            zIndex: 0,
+          };
+
+          // 상태 업데이트
+          pushHistory(prev => {
+            const newCuts = prev.cuts.map(cut => {
+              if (cut.id === cutId) {
+                return {
+                  ...cut,
+                  elements: [newElement, ...cut.elements]
+                };
+              }
+              return cut;
+            });
+            
+            return {
+              ...prev,
+              cuts: newCuts
+            };
+          });
+
+          // 각 이미지 생성 간 짧은 딜레이
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        console.log('✅ 모든 이미지가 캔버스에 적용되었습니다');
+      } else {
+        throw new Error(result.error || '배치 생성 실패');
+      }
+      
+    } catch (error) {
+      console.error('❌ 배치 생성 오류:', error);
+      alert(error instanceof Error ? error.message : '배치 생성 중 오류가 발생했습니다');
+    } finally {
+      setIsBatchGenerating(false);
+      setBatchProgress({ current: 0, total: 0 });
+      setPendingScript([]);
+    }
+  }, [canvasRatio, pushHistory, handleScriptGenerated]);
+
 
   // AI 이미지 생성 함수
   const generateImage = async (cutId: string) => {
@@ -2191,6 +2532,29 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
           return; // 에러로 던지지 않고 모달만 표시
         }
         
+        // 🚨 스토리지 부족 에러 처리 (507 Storage Full)
+        if (response.status === 507 || errorData.error?.includes('저장 공간이 부족') || errorData.error?.includes('스토리지')) {
+          console.log('💾 스토리지 부족 감지 - 업그레이드 모달 표시');
+          setUpgradeModalOpen(true);
+          return; // 에러로 던지지 않고 모달만 표시
+        }
+        
+        // 🚨 콘텐츠 정책 위반 에러 처리 (400 Bad Request)
+        if (response.status === 400 && (
+          errorData.error?.includes('이용정책에 맞지 않은') ||
+          errorData.error?.includes('건전한 콘텐츠') ||
+          errorData.error?.includes('저작권 침해')
+        )) {
+          console.log('🚫 콘텐츠 정책 위반 감지');
+          setToast({
+            id: Date.now().toString(),
+            title: "콘텐츠 정책 위반",
+            description: errorData.error,
+            type: "error"
+          });
+          return; // 에러로 던지지 않고 토스트만 표시
+        }
+        
         throw new Error(errorData.error || 'Failed to generate image');
       }
 
@@ -2236,16 +2600,19 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
         console.log('🔧 개발 모드: DB 저장 우회 - 로컬 상태만 업데이트');
       }
 
-      // 2️⃣ 로컬 상태 업데이트 (Race condition 방지)
-      setCuts(currentCuts => currentCuts.map(c => 
-        c.id === cutId 
-          ? { 
-              ...c, 
-              imageUrl: result.data?.imageUrl, 
-              generationId: result.data?.generationId
-            }
-          : c
-      ));
+      // 2️⃣ 히스토리 상태 업데이트 (정확한 상태 동기화)
+      pushHistory(prev => ({
+        ...prev,
+        cuts: prev.cuts.map(c => 
+          c.id === cutId 
+            ? { 
+                ...c, 
+                imageUrl: result.data?.imageUrl, 
+                generationId: result.data?.generationId
+              }
+            : c
+        )
+      }));
       
       // 변경사항 있음 표시
       setHasUnsavedChanges(true);
@@ -2358,12 +2725,15 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
         }
       }
 
-      // 2️⃣ 로컬 상태 업데이트 (Race condition 방지)
-      setCuts(currentCuts => currentCuts.map(c => 
-        c.id === cutId 
-          ? { ...c, imageUrl: result.data?.imageUrl }
-          : c
-      ));
+      // 2️⃣ 히스토리 상태 업데이트 (정확한 상태 동기화)
+      pushHistory(prev => ({
+        ...prev,
+        cuts: prev.cuts.map(c => 
+          c.id === cutId 
+            ? { ...c, imageUrl: result.data?.imageUrl }
+            : c
+        )
+      }));
       
       // 🔥 수정 완료 후 생성 중 상태 해제
       console.log('✅ 이미지 수정 완료:', cutId);
@@ -2549,7 +2919,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       width: 150,
       height: 40,
       fontSize: 16,
-      fontFamily: AVAILABLE_FONTS[0].fontFamily, // 기본: 본고딕
+      fontFamily: STUDIO_FONTS[0].fontFamily, // 기본: Noto Sans KR
+      fontWeight: STUDIO_FONTS[0].weights?.[0]?.weight || 400, // 기본 폰트 굵기
       color: '#000000'
     };
 
@@ -2560,7 +2931,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
           ? { ...cut, elements: [...cut.elements, newElement] }
           : cut
       ),
-      selectedElementId: newElement.id
+      selectedElementId: null // 텍스트 추가 후 선택 상태 해제
     }));
     
     setTextContent('');
@@ -2580,7 +2951,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       width: style.fontSize === 28 ? 250 : style.fontSize === 20 ? 200 : 150,  // 폰트 크기에 따른 적절한 너비
       height: style.fontSize === 28 ? 60 : style.fontSize === 20 ? 50 : 40,   // 폰트 크기에 따른 적절한 높이
       fontSize: style.fontSize,
-      fontFamily: AVAILABLE_FONTS[0].fontFamily,
+      fontFamily: STUDIO_FONTS[0].fontFamily,
       fontWeight: style.weight,
       color: '#000000',
       textAlign: 'center'
@@ -2593,13 +2964,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
           ? { ...cut, elements: [...cut.elements, newElement] }
           : cut
       ),
-      selectedElementId: newElement.id
+      selectedElementId: null // 텍스트 추가 후 선택 상태 해제
     }));
-    
-    // 🎯 텍스트 요소 생성 후 자동으로 인라인 편집 모드로 전환
-    setTimeout(() => {
-      startTextEditing(newElement.id, newElement.content || '');
-    }, 100);
   };
 
   const addBubbleElement = (style: 'speech' | 'thought' | 'shout' | 'whisper' = 'speech') => {
@@ -2952,23 +3318,15 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       // 각도 차이 계산
       let angleDiff = currentAngle - startAngle;
       
-      // 360도 순환 처리 (자연스러운 회전)
+      // 180도 경계 처리 - 간단한 보정
       if (angleDiff > 180) angleDiff -= 360;
       if (angleDiff < -180) angleDiff += 360;
       
-      // 최종 회전 각도 (0~360도 범위로 정규화)
+      // 최종 회전 각도
       let newRotation = initialRotation + angleDiff;
       
-      // 0~360도 범위로 정규화
-      while (newRotation < 0) newRotation += 360;
-      while (newRotation >= 360) newRotation -= 360;
-      
-      console.log('🔄 Rotation Move:', { 
-        currentAngle: currentAngle.toFixed(1), 
-        startAngle: startAngle.toFixed(1), 
-        angleDiff: angleDiff.toFixed(1), 
-        newRotation: newRotation.toFixed(1) 
-      });
+      // 0-360 범위로 정규화 (간단하게)
+      newRotation = ((newRotation % 360) + 360) % 360;
       
       // ⚡ 실시간 회전 업데이트 (히스토리 없이 부드러운 애니메이션)
       updateStateWithoutHistory(prev => ({
@@ -3010,7 +3368,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // 🎨 클릭 회전 기능 (15도씩)
+  // 🎨 클릭 회전 기능 (15도씩, 연속적인 회전)
   const rotateElement = (elementId: string, degrees: number = 15) => {
     pushHistory(prev => ({
       ...prev,
@@ -3313,7 +3671,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
           ctx.fillStyle = element.color || '#000000';
           
           // 🎯 폰트 설정 - 웹 폰트 로딩을 고려한 안전한 방식
-          const fontFamily = element.fontFamily || AVAILABLE_FONTS[0].fontFamily;
+          const fontFamily = element.fontFamily || STUDIO_FONTS[0].fontFamily;
           
           // Google Fonts 이름을 Canvas 호환 폰트명으로 매핑
           const fontMappings: Record<string, string> = {
@@ -3332,7 +3690,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
           const canvasFontFamily = fontMappings[fontFamily] || 
                                    fontFamily.replace(/['"]/g, '').split(',')[0].trim() || 
                                    'Arial';
-          const fontWeight = element.fontWeight || 'normal';
+          const fontWeight = element.fontWeight || 400;
           const fontStyle = element.fontStyle || 'normal';
           
           // 🎯 편집 화면과 정확히 동일한 폰트 크기 계산
@@ -4115,53 +4473,19 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                         {/* 📝 고급 텍스트 편집 패널 */}
                         {element.type === 'text' && (
                           <div className="space-y-4">
-                            {/* 🎨 폰트 선택 드롭다운 */}
+                            {/* 🎨 캔바급 폰트 선택기 */}
                             <div>
                               <label className="text-sm font-medium text-slate-700 mb-2 block">
                                 폰트
                               </label>
-                              <div className="relative" data-font-dropdown>
-                                <button
-                                  onClick={() => setShowFontDropdown(!showFontDropdown)}
-                                  className="w-full px-4 py-3 border border-slate-300 rounded-lg text-left bg-white hover:border-purple-400 transition-all flex items-center justify-between"
-                                >
-                                  <span 
-                                    className="font-medium text-slate-700"
-                                    style={{ fontFamily: element.fontFamily || AVAILABLE_FONTS[0].fontFamily }}
-                                  >
-                                    {AVAILABLE_FONTS.find(f => f.fontFamily === (element.fontFamily || AVAILABLE_FONTS[0].fontFamily))?.name || '본고딕 (Noto Sans)'}
-                                  </span>
-                                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showFontDropdown ? 'rotate-180' : ''}`} />
-                                </button>
-                                
-                                {showFontDropdown && (
-                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-[9999] max-h-64 overflow-y-auto">
-                                    {AVAILABLE_FONTS.map((font) => {
-                                      const isSelected = (element.fontFamily || AVAILABLE_FONTS[0].fontFamily) === font.fontFamily;
-                                      return (
-                                        <button
-                                          key={font.id}
-                                          onClick={() => {
-                                            updateElementProperty(selectedElementId!, { fontFamily: font.fontFamily });
-                                            setShowFontDropdown(false);
-                                          }}
-                                          className={`w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors ${
-                                            isSelected ? 'bg-purple-50' : ''
-                                          }`}
-                                        >
-                                          <div 
-                                            className="text-sm font-medium text-slate-700"
-                                            style={{ fontFamily: font.fontFamily }}
-                                          >
-                                            {font.name}
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
+                              <FontSelector
+                                selectedFontFamily={element.fontFamily || STUDIO_FONTS[0]?.fontFamily || 'Noto Sans KR'}
+                                selectedFontWeight={element.fontWeight || 400}
+                                onFontChange={handleFontChange}
+                                className="w-full"
+                              />
                             </div>
+
 
                             {/* 📏 폰트 크기 컨트롤 */}
                             <div className="grid grid-cols-2 gap-3">
@@ -4799,6 +5123,74 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                     )}
                   </div>
 
+                  {/* 등장 요소 선택 */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                      <Package className="h-4 w-4 text-green-600" />
+                      등장 요소 
+                      <span className="text-xs text-slate-500 font-normal">(선택사항)</span>
+                    </label>
+                    {scriptElements.length === 0 ? (
+                      <div className="text-center py-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                        <div className="w-12 h-12 bg-slate-200 rounded-full mx-auto mb-3 flex items-center justify-center">
+                          <Package className="h-6 w-6 text-slate-400" />
+                        </div>
+                        <p className="text-sm text-slate-500 font-medium">등록된 요소가 없습니다</p>
+                        <p className="text-xs text-slate-400 mt-1">먼저 요소를 추가해보세요</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
+                        {scriptElements.map((element) => (
+                          <div
+                            key={element.id}
+                            className={cn(
+                              "flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:shadow-sm",
+                              selectedScriptElements.includes(element.id)
+                                ? "border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 shadow-sm"
+                                : "border-slate-200 hover:border-slate-300 bg-white"
+                            )}
+                            onClick={() => handleScriptElementToggle(element.id)}
+                          >
+                            {/* 요소 아바타 */}
+                            <div className="relative flex-shrink-0">
+                              {element.thumbnailUrl ? (
+                                <img
+                                  src={element.thumbnailUrl}
+                                  alt={element.name}
+                                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                                  {element.name.charAt(0)}
+                                </div>
+                              )}
+                              {selectedScriptElements.includes(element.id) && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 요소 정보 */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-slate-800 truncate">
+                                {element.name}
+                              </div>
+                              <div className="text-xs text-slate-500 truncate leading-relaxed">
+                                {element.description || '설명이 없습니다'}
+                              </div>
+                              {element.category && (
+                                <div className="text-xs text-green-600 font-medium">
+                                  {element.category}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* 생성 버튼 */}
                   <Button
                     onClick={generateScript}
@@ -5040,8 +5432,24 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                     
                     {/* 업로드된 이미지 목록 */}
                     <div className="mt-6">
-                      <div className="text-sm font-medium text-slate-700 mb-3">
-                        업로드된 이미지 ({uploadedImages.length})
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-medium text-slate-700">
+                          업로드된 이미지 ({uploadedImages.length})
+                        </div>
+                        {uploadedImages.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                            <select
+                              value={sortOrder}
+                              onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest' | 'name')}
+                              className="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-600 hover:border-purple-300 focus:border-purple-400 focus:outline-none"
+                            >
+                              <option value="newest">최신순</option>
+                              <option value="oldest">오래된순</option>
+                              <option value="name">이름순</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
                       {isLoadingFiles ? (
                         <div className="text-center py-8 text-slate-400">
@@ -5056,7 +5464,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
-                          {uploadedImages.map((image) => (
+                          {sortedUploadedImages.map((image) => (
                             <div
                               key={image.id}
                               className="relative group border border-slate-200 rounded-lg overflow-hidden hover:border-purple-300 transition-colors cursor-grab active:cursor-grabbing"
@@ -5123,17 +5531,20 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                               </div>
                               <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all"></div>
                               
-                              {/* 삭제 버튼 */}
+                              {/* 삭제 버튼 - 개선된 UI */}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (confirm(`"${image.name}" 파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-                                    handleFileDelete(image.id);
-                                  }
+                                  setDeleteConfirm({
+                                    isOpen: true,
+                                    imageId: image.id,
+                                    imageName: image.name
+                                  });
                                 }}
-                                className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600"
+                                className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center hover:bg-red-600 hover:scale-110 shadow-lg"
+                                title={`"${image.name}" 삭제`}
                               >
-                                <X className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
                               
                               {/* 파일명 표시 */}
@@ -5518,20 +5929,17 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                     >
                       {/* 배경 이미지 */}
                       {cut.imageUrl ? (
-                        <img 
-                          src={cut.imageUrl} 
+                        <OptimizedCanvasImage
+                          src={cut.imageUrl}
                           alt={`${index + 1}컷`}
-                          className="absolute inset-0 w-full h-full pointer-events-none select-none"
-                          draggable={false}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={(e) => e.preventDefault()}
-                          onContextMenu={(e) => e.preventDefault()}
+                          cutId={cut.id}
+                          generationId={cut.generationId}
+                          className="pointer-events-none select-none"
                           style={{
                             objectFit: 'cover', // 비율 유지하면서 캔버스 채우기
                             objectPosition: 'center',
                             zIndex: 1 // 배경 이미지는 가장 낮은 레이어
                           }}
-                          draggable={false}
                         />
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
@@ -5556,7 +5964,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                           key={element.id}
                           className={cn(
                             "absolute cursor-move select-none",
-                            !isDraggingElement && "transition-all duration-150",
+                            // 회전 중이 아닐 때만 transition 적용 (360도 깜빡임 방지)
+                            !isRotating && "transition-transform duration-150 ease-out",
                             // 🎨 프리미엄 Canva 스타일 선택 효과
                             (selectedElementId === element.id || selectedElementIds.includes(element.id))
                               ? "border-2 border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/30" 
@@ -5575,15 +5984,14 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                               transform: element.rotation ? `rotate(${element.rotation}deg)` : 'none',
                               transformOrigin: 'center center',
                               cursor: isRotating && selectedElementId === element.id ? 'grabbing' : 'default',
-                              // 🎯 명확한 레이어 구조: 배경(1) < AI이미지(5) < 말풍선(10) < 텍스트(15) < 선택된요소(9999) < 드래그중(99999)
-                              zIndex: isDraggingElement && draggedElement?.id === element.id ? 99999 : 
-                                     selectedElementId === element.id ? 9999 : 
-                                     element.type === 'text' ? 15 :
+                              // 🎯 부드러운 레이어 구조: 배경(1) < AI이미지(5) < 말풍선(10) < 텍스트(12) < 선택된요소(20) < 드래그중(30)
+                              zIndex: isDraggingElement && draggedElement?.id === element.id ? 30 : 
+                                     selectedElementId === element.id ? 20 : 
+                                     element.type === 'text' ? 12 :
                                      element.type === 'bubble' ? 10 :
                                      element.type === 'image' ? 5 : 10,
                               // 회전 중일 때 시각적 피드백
-                              opacity: isRotating && selectedElementId === element.id ? 0.9 : 1,
-                              transition: isRotating ? 'none' : 'opacity 0.2s ease'
+                              opacity: isRotating && selectedElementId === element.id ? 0.9 : 1
                             };
                           })()}
                           onClick={(e) => {
@@ -5793,9 +6201,9 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                                 }`}
                                 style={{
                                   fontSize: `${(element.fontSize || 16) * (zoom / 100)}px`,
-                                  fontFamily: element.fontFamily || AVAILABLE_FONTS[0].fontFamily,
+                                  fontFamily: element.fontFamily || STUDIO_FONTS[0].fontFamily,
                                   color: element.color || '#000000',
-                                  fontWeight: element.fontWeight || 'normal',
+                                  fontWeight: element.fontWeight || 400,
                                   fontStyle: element.fontStyle || 'normal',
                                   textDecoration: element.textDecoration || 'none',
                                   textAlign: element.textAlign || 'center',
@@ -5818,9 +6226,9 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                                 }`}
                                 style={{
                                   fontSize: `${(element.fontSize || 16) * (zoom / 100)}px`,
-                                  fontFamily: element.fontFamily || AVAILABLE_FONTS[0].fontFamily,
+                                  fontFamily: element.fontFamily || STUDIO_FONTS[0].fontFamily,
                                   color: element.color || '#000000',
-                                  fontWeight: element.fontWeight || 'normal',
+                                  fontWeight: element.fontWeight || 400,
                                   fontStyle: element.fontStyle || 'normal',
                                   textDecoration: element.textDecoration || 'none',
                                   textAlign: element.textAlign || 'center',
@@ -6088,12 +6496,12 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                                 </>
                               )}
 
-                              {/* 드래그 회전 버튼 (우하단) */}
-                              <div className="absolute -bottom-8 -right-8 z-25 flex flex-col items-center">
+                              {/* 드래그 회전 버튼 (하단 중앙) */}
+                              <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-25 flex flex-col items-center">
                                 {/* 회전 각도 표시 */}
                                 {(isRotating && selectedElementId === element.id) && (
                                   <div className="mb-2 px-2 py-1 bg-black/80 text-white text-xs rounded-md whitespace-nowrap">
-                                    {Math.round((element.rotation || 0) % 360)}°
+                                    {Math.round(element.rotation || 0)}°
                                   </div>
                                 )}
                                 
@@ -6645,8 +7053,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                   </div>
                 )}
 
-                {/* 선택된 텍스트 요소 속성만 표시 */}
-                {selectedElement && selectedElement.type === 'text' && selectedElementIds.length <= 1 && (
+                {/* 선택된 텍스트 요소 속성만 표시 (AI 생성 탭이 아닐 때만) */}
+                {selectedElement && selectedElement.type === 'text' && selectedElementIds.length <= 1 && activeTab !== 'ai-character' && activeTab !== 'ai-script' && (
                   <div className="pt-4 border-t border-slate-200 space-y-3">
                     <h4 className="text-sm font-medium text-slate-700">
                       텍스트 속성
@@ -6717,10 +7125,15 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                       </Button>
                     </div>
                     <div className="relative aspect-square bg-slate-100 overflow-hidden rounded-lg border border-slate-200">
-                      <img 
-                        src={selectedCut.imageUrl} 
+                      <OptimizedCanvasImage
+                        src={selectedCut.imageUrl}
                         alt="생성된 이미지"
-                        className="w-full h-full object-fill"
+                        cutId={`sidebar-${selectedCut.id}`}
+                        generationId={selectedCut.generationId}
+                        className="w-full h-full"
+                        style={{
+                          objectFit: 'fill'
+                        }}
                       />
                     </div>
                     <div className="w-full">
@@ -6802,7 +7215,8 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       <Dialog open={showAIScriptModal} onOpenChange={setShowAIScriptModal}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <AIScriptGenerator 
-            onScriptGenerated={handleScriptGenerated}
+            onScriptGenerated={handleBatchGeneration}
+            onApplyToCanvas={handleApplyToCanvas}
             className="border-0 shadow-none"
           />
         </DialogContent>
@@ -6905,6 +7319,43 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                 업그레이드하기
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteConfirm.isOpen} onOpenChange={(open) => !open && setDeleteConfirm({isOpen: false, imageId: '', imageName: ''})}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              파일 삭제
+            </DialogTitle>
+            <DialogDescription className="text-slate-600">
+              정말로 <span className="font-medium text-slate-800">"{deleteConfirm.imageName}"</span> 파일을 삭제하시겠습니까?
+              <br />
+              <span className="text-red-500 font-medium">이 작업은 되돌릴 수 없습니다.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setDeleteConfirm({isOpen: false, imageId: '', imageName: ''})}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                handleFileDelete(deleteConfirm.imageId);
+                setDeleteConfirm({isOpen: false, imageId: '', imageName: ''});
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              삭제
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

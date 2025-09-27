@@ -10,11 +10,13 @@ export interface User {
   referredBy?: string;
 }
 
-// 구독 관련 타입
+// 구독 관련 타입 (새로운 4티어 구조)
 export enum SubscriptionPlan {
   FREE = "FREE",
+  STARTER = "STARTER",
   PRO = "PRO",
   PREMIUM = "PREMIUM",
+  ADMIN = "ADMIN",
 }
 
 export interface Subscription {

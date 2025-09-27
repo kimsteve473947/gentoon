@@ -28,6 +28,9 @@ model User {
   elements          Element[]        // ✨ 요소 추가
   generations       Generation[]
   transactions      Transaction[]
+  refunds           Refund[]         // 환불 내역
+  cashReceipts      CashReceipt[]    // 현금영수증 내역
+  cashReceiptSettings UserCashReceiptSettings? // 현금영수증 설정
   referralCode      String         @unique @default(uuid())
   referredBy        String?
   referralRewards   ReferralReward[] @relation("referrer")
@@ -53,13 +56,27 @@ model Subscription {
   
   // 플랜 정보
   plan              SubscriptionPlan @default(FREE)
-  tokensTotal       Int            @default(0)
-  tokensUsed        Int            @default(0)
+  
+  // 🔄 토큰 시스템 분리 (이미지 생성 vs 텍스트 생성)
+  imageTokensTotal     Int            @default(0)    // 이미지 생성 토큰 총량
+  imageTokensUsed      Int            @default(0)    // 이미지 생성 토큰 사용량
+  textTokensTotal      Int            @default(0)    // 텍스트 생성 토큰 총량 
+  textTokensUsed       Int            @default(0)    // 텍스트 생성 토큰 사용량
+  
+  // 🎯 AI 대본 생성 횟수 시스템 (단순 횟수 기반)
+  scriptGenerationsTotal Int          @default(15)   // AI 대본 생성 월 한도
+  scriptGenerationsUsed  Int          @default(0)    // AI 대본 생성 사용 횟수
+  
+  // 🚨 하위 호환성을 위한 레거시 필드 (deprecated)
+  tokensTotal       Int            @default(0)    // @deprecated - imageTokensTotal로 대체
+  tokensUsed        Int            @default(0)    // @deprecated - imageTokensUsed로 대체
+  
   maxCharacters     Int            @default(1)
   
   // 결제 정보
   tossBillingKey    String?        // 빌링키 (정기결제용)
   tossCustomerKey   String?        // 고객 고유 키
+  paymentMethod     PaymentMethod? // 결제수단 (카드/토스페이/카카오페이)
   tossCustomerId    String?        // 토스 고객 ID (deprecated)
   tossSubscriptionId String?       // 토스 구독 ID (deprecated)
   
@@ -72,6 +89,9 @@ model Subscription {
   tokensResetDate    DateTime      @default(now()) // 토큰이 마지막으로 초기화된 날짜
   nextTokensReset    DateTime      // 다음 토큰 초기화 예정일 (결제일 기준 30일)
   
+  // 관계
+  refunds           Refund[]       // 환불 내역
+  
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   
@@ -79,12 +99,20 @@ model Subscription {
   @@map("subscription")
 }
 
-// 구독 플랜 enum
+// 구독 플랜 enum (새로운 4티어 구조)
 enum SubscriptionPlan {
-  FREE        // 무료: 10토큰, 캐릭터 1개, 프로젝트 3개
-  PRO         // 프로: 50만 토큰, 캐릭터 3개, 무제한 프로젝트
-  PREMIUM     // 프리미엄: 200만 토큰, 캐릭터 5개, 무제한 프로젝트
-  ADMIN       // 관리자: 무제한 토큰, 무제한 캐릭터, 무제한 프로젝트
+  FREE        // 무료: 1만 토큰, 캐릭터 2개, 8장 이미지
+  STARTER     // 스타터: 35만 토큰, 캐릭터 5개, 270장 이미지 (29,000원)
+  PRO         // 프로: 70만 토큰, 캐릭터 10개, 540장 이미지 (59,000원)
+  PREMIUM     // 프리미엄: 120만 토큰, 캐릭터 20개, 930장 이미지 (99,000원)
+  ADMIN       // 관리자: 무제한 토큰, 무제한 캐릭터, 무제한 이미지
+}
+
+// 결제수단 enum
+enum PaymentMethod {
+  CARD        // 신용/체크카드
+  TOSSPAY     // 토스페이  
+  KAKAOPAY    // 카카오페이
 }
 
 // 캐릭터 모델
@@ -292,6 +320,10 @@ model Transaction {
   status            TransactionStatus @default(PENDING)
   description       String?
   
+  // 관계
+  refunds           Refund[]       // 환불 내역
+  cashReceipt       CashReceipt?   // 현금영수증 (1:1 관계)
+  
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   
@@ -346,7 +378,7 @@ model UserStorage {
   
   usedBytes         Int            @default(0) @map("used_bytes")
   fileCount         Int            @default(0) @map("file_count")
-  maxBytes          Int            @default(1073741824) @map("max_bytes") // 기본 1GB
+  maxBytes          Int            @default(314572800) @map("max_bytes") // 기본 300MB (FREE 플랜)
   
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
@@ -389,7 +421,7 @@ model UserUsageCache {
   totalCharacters     Int            @default(0) @map("total_characters")
   totalProjects       Int            @default(0) @map("total_projects")
   storageUsedBytes    BigInt         @default(0) @map("storage_used_bytes")
-  storageLimitBytes   BigInt         @default(1073741824) @map("storage_limit_bytes")
+  storageLimitBytes   BigInt         @default(314572800) @map("storage_limit_bytes") // 기본 300MB (FREE 플랜)
   
   lastCalculated      DateTime       @default(now()) @map("last_calculated")
   createdAt           DateTime       @default(now()) @map("created_at")
@@ -418,9 +450,11 @@ model Inquiry {
   respondedAt       DateTime?      @map("responded_at")
   
   // 추가 정보
+  userPhone         String?        @map("user_phone") // 사용자가 입력한 전화번호
   userEmail         String?        @map("user_email") // 사용자가 입력한 연락처
   userAgent         String?        @map("user_agent") // 브라우저 정보
   ipAddress         String?        @map("ip_address")
+  attachments       Json?          // 첨부파일 URL 배열 (JSON 형태)
   
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
@@ -453,4 +487,431 @@ enum InquiryStatus {
   in_progress // 처리중
   resolved    // 해결됨
   closed      // 종료됨
+}
+
+// 🎨 폰트 패밀리 모델 (Canva급 다중 weight 시스템)
+model FontFamily {
+  id                String         @id @default(uuid())
+  
+  // 폰트 패밀리 기본 정보
+  nameKo            String         // 한글 이름 (예: Noto Sans KR)
+  nameEn            String         // 영문 이름 (예: Noto Sans KR)
+  fontFamily        String         @unique // CSS font-family 값
+  
+  // 카테고리 및 메타데이터
+  category          FontCategory   // 고딕, 명조, 손글씨, 장식, 코딩
+  provider          String         // 제공처 (예: 구글 폰트, 한국출판인회의)
+  licenseType       String         @default("사용 가능") // 임베딩 권한 상태
+  originalUrl       String?        // 원본 페이지 URL
+  description       String?        // 폰트 설명
+  
+  // 패밀리 전체 사용 통계
+  totalUsageCount   Int            @default(0) // 전체 사용 횟수
+  isActive          Boolean        @default(true) // 활성화 상태
+  isFeatured        Boolean        @default(false) // 추천 폰트 여부
+  
+  // 관계
+  variants          FontVariant[]   // 이 패밀리의 모든 weight/style variants
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([category])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([totalUsageCount])
+  @@map("font_family")
+}
+
+// 🎨 폰트 배리언트 모델 (각 weight/style별 세부 정보)
+model FontVariant {
+  id                String         @id @default(uuid())
+  
+  // 패밀리 관계
+  fontFamilyId      String
+  fontFamily        FontFamily     @relation(fields: [fontFamilyId], references: [id], onDelete: Cascade)
+  
+  // Weight & Style 정보
+  weight            Int            // 100, 200, 300, 400, 500, 600, 700, 800, 900
+  weightName        String         // Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold, Black
+  style             FontStyle      @default(normal) // normal, italic
+  
+  // 웹폰트 CSS 정보
+  cssCode           String         @db.Text // @font-face CSS 코드
+  cdnUrl            String?        // CDN URL
+  fileUrl           String?        // 실제 폰트 파일 URL
+  fileFormat        String?        // woff2, woff, ttf 등
+  
+  // 개별 variant 사용 통계
+  usageCount        Int            @default(0) // 이 variant의 사용 횟수
+  isActive          Boolean        @default(true) // 활성화 상태
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@unique([fontFamilyId, weight, style]) // 한 패밀리 내에서 weight+style 조합은 유니크
+  @@index([fontFamilyId])
+  @@index([weight])
+  @@index([isActive])
+  @@index([usageCount])
+  @@map("font_variant")
+}
+
+// 폰트 카테고리 enum
+enum FontCategory {
+  gothic      // 고딕체
+  serif       // 명조/바탕체
+  handwriting // 손글씨체
+  decorative  // 장식체
+  monospace   // 코딩체/고정폭
+}
+
+// 폰트 스타일 enum
+enum FontStyle {
+  normal
+  italic
+}
+
+// 📧 이메일 알림 템플릿 모델
+model EmailTemplate {
+  id                String         @id @default(uuid())
+  
+  // 템플릿 기본 정보
+  name              String         // 템플릿 이름
+  subject           String         // 이메일 제목 템플릿
+  content           String         @db.Text // 이메일 내용 (HTML 지원)
+  type              EmailType      @default(marketing) // 템플릿 유형
+  
+  // 메타데이터
+  description       String?        // 템플릿 설명
+  isActive          Boolean        @default(true) // 활성화 상태
+  
+  // 사용 통계
+  sentCount         Int            @default(0) // 발송 횟수
+  lastUsedAt        DateTime?      // 마지막 사용 일시
+  
+  // 관리자 정보
+  createdBy         String?        // 생성한 관리자 이메일
+  updatedBy         String?        // 수정한 관리자 이메일
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // 관계
+  emails            EmailCampaign[] // 이 템플릿으로 발송한 캠페인들
+  
+  @@index([type])
+  @@index([isActive])
+  @@index([sentCount])
+  @@map("email_template")
+}
+
+// 📧 이메일 캠페인 모델 (실제 발송 기록)
+model EmailCampaign {
+  id                String         @id @default(uuid())
+  
+  // 캠페인 기본 정보
+  name              String?        // 캠페인 이름 (내부 관리용)
+  subject           String         // 실제 발송된 제목
+  content           String         @db.Text // 실제 발송된 내용
+  
+  // 발송 대상
+  targetType        EmailTargetType // 발송 대상 유형
+  customEmails      String?        @db.Text // 커스텀 이메일 목록 (JSON)
+  
+  // 발송 상태
+  status            EmailStatus    @default(pending) // 발송 상태
+  recipientCount    Int            @default(0) // 수신자 수
+  sentCount         Int            @default(0) // 실제 발송 성공 수
+  failedCount       Int            @default(0) // 발송 실패 수
+  
+  // 성과 지표
+  deliveredCount    Int            @default(0) // 배달 성공 수
+  openedCount       Int            @default(0) // 열람 수
+  clickedCount      Int            @default(0) // 클릭 수
+  bounceCount       Int            @default(0) // 반송 수
+  
+  // 템플릿 연결
+  templateId        String?        // 사용한 템플릿 ID (없으면 직접 작성)
+  template          EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  
+  // 발송 시간
+  scheduledAt       DateTime?      // 예약 발송 시간
+  sentAt            DateTime?      // 실제 발송 시간
+  completedAt       DateTime?      // 발송 완료 시간
+  
+  // 관리자 정보
+  sentBy            String         // 발송한 관리자 이메일
+  
+  // 메타데이터
+  metadata          Json?          // 추가 메타데이터 (세그먼트 정보 등)
+  errorLog          String?        @db.Text // 에러 로그
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([status])
+  @@index([sentAt])
+  @@index([targetType])
+  @@index([templateId])
+  @@map("email_campaign")
+}
+
+// 📧 이메일 수신자별 추적 모델 (상세 분석용)
+model EmailRecipient {
+  id                String         @id @default(uuid())
+  
+  campaignId        String         // 캠페인 ID
+  email             String         // 수신자 이메일
+  userId            String?        // 수신자 사용자 ID (회원인 경우)
+  
+  // 발송 상태
+  status            EmailDeliveryStatus @default(pending) // 개별 발송 상태
+  sentAt            DateTime?      // 발송 시간
+  deliveredAt       DateTime?      // 배달 시간
+  
+  // 사용자 행동 추적
+  openedAt          DateTime?      // 첫 열람 시간
+  openCount         Int            @default(0) // 열람 횟수
+  lastOpenedAt      DateTime?      // 마지막 열람 시간
+  
+  clickedAt         DateTime?      // 첫 클릭 시간
+  clickCount        Int            @default(0) // 클릭 횟수
+  lastClickedAt     DateTime?      // 마지막 클릭 시간
+  
+  // 반송/에러 정보
+  bounceReason      String?        // 반송 사유
+  errorMessage      String?        // 에러 메시지
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@unique([campaignId, email])
+  @@index([campaignId])
+  @@index([email])
+  @@index([userId])
+  @@index([status])
+  @@map("email_recipient")
+}
+
+// 이메일 템플릿 유형
+enum EmailType {
+  marketing      // 마케팅 이메일
+  system         // 시스템 알림
+  announcement   // 공지사항
+  welcome        // 환영 이메일
+  newsletter     // 뉴스레터
+  promotion      // 프로모션
+}
+
+// 이메일 발송 대상 유형
+enum EmailTargetType {
+  all            // 전체 사용자
+  free           // 무료 플랜 사용자
+  paid           // 유료 플랜 사용자
+  starter        // 스타터 플랜
+  pro            // 프로 플랜  
+  premium        // 프리미엄 플랜
+  inactive       // 비활성 사용자
+  active         // 활성 사용자
+  custom         // 커스텀 이메일 목록
+}
+
+// 이메일 캠페인 상태
+enum EmailStatus {
+  pending        // 대기 중
+  sending        // 발송 중
+  sent           // 발송 완료
+  failed         // 발송 실패
+  cancelled      // 취소됨
+  scheduled      // 예약됨
+}
+
+// 개별 이메일 배달 상태
+enum EmailDeliveryStatus {
+  pending        // 대기 중
+  sent           // 발송됨
+  delivered      // 배달됨
+  bounced        // 반송됨
+  failed         // 실패
+  blocked        // 차단됨
+}
+
+// 💰 환불 관리 모델
+model Refund {
+  id                String         @id @default(uuid())
+  
+  // 환불 대상 정보
+  userId            String         @map("user_id")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  subscriptionId    String?        @map("subscription_id")
+  subscription      Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  
+  transactionId     String?        @map("transaction_id")
+  transaction       Transaction?   @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  
+  // 토스페이먼츠 정보
+  payToken          String         @map("pay_token")      // 토스페이먼츠 결제 토큰
+  refundNo          String         @unique @map("refund_no") // 토스페이먼츠 환불 번호
+  
+  // 환불 상세 정보
+  refundAmount      Int            @map("refund_amount")  // 환불 금액
+  refundType        RefundType     @default(FULL) @map("refund_type") // 환불 유형
+  reason            String         @db.Text              // 환불 사유
+  status            RefundStatus   @default(PENDING)     // 환불 상태
+  
+  // 관리자 정보
+  processedBy       String?        @map("processed_by")   // 처리한 관리자 ID
+  processedAt       DateTime?      @map("processed_at")   // 처리 시간
+  
+  // 토스페이먼츠 응답 데이터
+  tossData          Json?          @map("toss_data")      // 토스페이먼츠 응답 전체 데이터
+  
+  // 추가 메모
+  adminNote         String?        @db.Text @map("admin_note") // 관리자 메모
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  
+  @@index([userId])
+  @@index([refundNo])
+  @@index([status])
+  @@index([processedAt])
+  @@index([createdAt])
+  @@map("refund")
+}
+
+// 환불 유형
+enum RefundType {
+  FULL            // 전액 환불
+  PARTIAL         // 부분 환불
+}
+
+// 환불 상태
+enum RefundStatus {
+  PENDING         // 처리 대기
+  PROCESSING      // 처리 중
+  COMPLETED       // 완료
+  FAILED          // 실패
+  CANCELLED       // 취소됨
+}
+
+// 현금영수증 모델
+model CashReceipt {
+  id                    String                 @id @default(uuid())
+  
+  // 연관 관계
+  userId                String                 @map("user_id")
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  transactionId         String                 @map("transaction_id")
+  transaction           Transaction            @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  // 토스페이먼츠 정보
+  payToken              String                 @map("pay_token")        // 토스페이먼츠 결제 토큰
+  cashReceiptMgtKey     String?                @map("cash_receipt_mgt_key") // 현금영수증 관리번호
+  
+  // 현금영수증 요청 정보
+  cashReceiptKey        String                 @map("cash_receipt_key")     // 식별자 (휴대폰, 사업자번호, 카드번호)
+  cashReceiptKeyType    CashReceiptKeyType     @map("cash_receipt_key_type") // 식별자 타입
+  cashReceiptPurpose    CashReceiptPurpose     @map("cash_receipt_purpose")  // 현금영수증 용도
+  
+  // 현금영수증 상세 정보
+  customerName          String?                @map("customer_name")
+  itemName              String?                @map("item_name")
+  identityNum           String?                @map("identity_num")
+  taxationType          String?                @map("taxation_type")
+  totalAmount           Int?                   @map("total_amount")
+  supplyCost            Int?                   @map("supply_cost")
+  tax                   Int?                   @map("tax")
+  serviceFee            Int?                   @map("service_fee")
+  tradeUsage            String?                @map("trade_usage")
+  tradeType             String?                @map("trade_type")
+  
+  // 상태 및 처리 정보
+  status                CashReceiptStatus      @default(PENDING)
+  issueStatus           String?                @map("issue_status")      // 토스페이먼츠 발급 상태
+  failureReason         String?                @map("failure_reason")     // 실패 사유
+  
+  // 자동 발급 설정
+  autoIssue             Boolean                @default(false) @map("auto_issue")
+  issueRequested        Boolean                @default(false) @map("issue_requested")
+  
+  // 처리 정보
+  issuedAt              DateTime?              @map("issued_at")
+  revokedAt             DateTime?              @map("revoked_at")
+  processedBy           String?                @map("processed_by")       // 처리한 관리자 ID
+  
+  // 토스페이먼츠 응답 데이터
+  tossResponseData      Json?                  @map("toss_response_data")
+  
+  // 팝업 URI
+  popupUri              String?                @map("popup_uri")
+  
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  
+  @@unique([transactionId])
+  @@index([userId])
+  @@index([payToken])
+  @@index([status])
+  @@index([cashReceiptKeyType])
+  @@index([autoIssue])
+  @@index([createdAt])
+  @@map("cash_receipt")
+}
+
+// 현금영수증 식별자 타입
+enum CashReceiptKeyType {
+  PHONE       // 휴대폰 번호
+  CORPORATE   // 사업자등록번호
+  CARD        // 현금영수증 카드
+}
+
+// 현금영수증 용도
+enum CashReceiptPurpose {
+  DEDUCTION   // 소득공제 (개인)
+  EVIDENCE    // 지출증빙 (사업자)
+}
+
+// 현금영수증 상태
+enum CashReceiptStatus {
+  PENDING           // 발급 대기
+  REQUESTED         // 발급 요청됨
+  IN_PROGRESS       // 국세청 전송 중
+  ISSUE_APPLIED     // 발급 신청 완료
+  ISSUE_COMPLETE    // 발급 완료
+  ISSUE_FAILED      // 발급 실패
+  REVOKED           // 취소됨
+  ERROR             // 오류
+}
+
+// 사용자 현금영수증 설정 모델
+model UserCashReceiptSettings {
+  id                    String                 @id @default(uuid())
+  
+  // 사용자 관계
+  userId                String                 @unique @map("user_id")
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 현금영수증 설정
+  cashReceiptKey        String                 @map("cash_receipt_key")     // 식별자 (휴대폰, 사업자번호, 카드번호)
+  cashReceiptKeyType    CashReceiptKeyType     @map("cash_receipt_key_type") // 식별자 타입
+  cashReceiptPurpose    CashReceiptPurpose     @map("cash_receipt_purpose")  // 현금영수증 용도
+  
+  // 자동 발급 설정
+  autoIssue             Boolean                @default(true) @map("auto_issue")
+  isActive              Boolean                @default(true) @map("is_active")
+  
+  // 설정 메타데이터
+  lastUsed              DateTime?              @map("last_used")
+  
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  
+  @@index([userId])
+  @@index([autoIssue])
+  @@index([isActive])
+  @@map("user_cash_receipt_settings")
 }

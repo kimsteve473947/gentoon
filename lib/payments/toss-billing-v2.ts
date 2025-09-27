@@ -1,35 +1,47 @@
 import { loadTossPayments } from "@tosspayments/payment-sdk";
 import { createClient } from "@/lib/supabase/server";
 import { tokenManager } from "@/lib/subscription/token-manager";
+import { SubscriptionPlan } from "@/types";
 
-// token-manager.ts에서 플랜 설정 가져오기
+// plan-config.ts에서 플랜 설정 가져오기 (새로운 4티어 구조)
+import { PLAN_CONFIGS } from "@/lib/subscription/plan-config";
+
 const SUBSCRIPTION_CONFIG = {
   FREE: {
     id: "FREE",
-    name: "무료",
-    price: 0,
-    tokens: 10000,      // 1만 토큰
-    characters: 2,
-    projects: 3,
+    name: PLAN_CONFIGS.FREE.name,
+    price: PLAN_CONFIGS.FREE.price,
+    tokens: PLAN_CONFIGS.FREE.platformTokens,
+    characters: PLAN_CONFIGS.FREE.maxCharacters,
+    projects: 999,
     description: "무료 체험용 플랜",
+  },
+  STARTER: {
+    id: "STARTER",
+    name: PLAN_CONFIGS.STARTER.name,
+    price: PLAN_CONFIGS.STARTER.price,
+    tokens: PLAN_CONFIGS.STARTER.platformTokens,
+    characters: PLAN_CONFIGS.STARTER.maxCharacters,
+    projects: 999,
+    description: "개인 사용자에게 적합해요",
   },
   PRO: {
     id: "PRO",
-    name: "베이직",
-    price: 30000,
-    tokens: 400000,     // 40만 토큰
-    characters: 7,
+    name: PLAN_CONFIGS.PRO.name,
+    price: PLAN_CONFIGS.PRO.price,
+    tokens: PLAN_CONFIGS.PRO.platformTokens,
+    characters: PLAN_CONFIGS.PRO.maxCharacters,
     projects: 999,
-    description: "정기적으로 창작하는 분들께",
+    description: "기업 실무자에게 적합해요",
   },
   PREMIUM: {
     id: "PREMIUM",
-    name: "프로",
-    price: 100000,
-    tokens: 1500000,    // 150만 토큰
-    characters: 15,
+    name: PLAN_CONFIGS.PREMIUM.name,
+    price: PLAN_CONFIGS.PREMIUM.price,
+    tokens: PLAN_CONFIGS.PREMIUM.platformTokens,
+    characters: PLAN_CONFIGS.PREMIUM.maxCharacters,
     projects: 999,
-    description: "전문 창작자를 위한",
+    description: "전문 제작자에게 적합해요",
   },
 } as const;
 
@@ -100,7 +112,7 @@ export async function createBillingAuthRequest(
     customerKey,
     customerEmail,
     customerName: customerName || "고객",
-    successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-success?planId=${planId}&customerKey=${customerKey}&amount=${amount}`,
+    successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-success?planId=${planId}&amount=${amount}`,
     failUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-fail`,
   };
 }

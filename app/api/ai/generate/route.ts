@@ -9,6 +9,7 @@ import { generationQueue } from "@/lib/ai/generation-queue";
 import { logImageGeneration } from "@/lib/logging/activity-logger";
 import { createClient } from "@/lib/supabase/server";
 import { usageTriggers } from "@/lib/usage/cache-manager";
+import { trackStorageUsage } from "@/lib/storage/tracker";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -182,6 +183,22 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     // 🚀 사용량 캐시 업데이트 - 이미지 생성
     await usageTriggers.onImageGenerated(userId, result.tokensUsed);
 
+    // 📊 스토리지 사용량 업데이트 - 생성된 이미지 추가
+    try {
+      // 생성된 이미지의 실제 파일 크기로 스토리지 업데이트 (약 500KB로 추정했던 크기 사용)
+      const actualFileSize = estimatedFileSize; // 실제로는 생성된 파일의 정확한 크기를 알 수 있다면 더 좋음
+      const storageResult = await trackStorageUsage(userId, actualFileSize, 'add');
+      
+      if (storageResult.success) {
+        console.log(`📊 스토리지 업데이트 완료: +${actualFileSize} bytes (총 ${storageResult.currentUsage} bytes)`);
+      } else {
+        console.error('스토리지 업데이트 실패:', storageResult.error);
+      }
+    } catch (storageError) {
+      console.error('스토리지 추적 오류:', storageError);
+      // 스토리지 추적 실패해도 이미지 생성은 성공했으므로 계속 진행
+    }
+
     // 🚀 활동 로깅 - 이미지 생성 성공
     await logImageGeneration(userId, result.tokensUsed, imageCount, 'completed');
 
@@ -212,7 +229,21 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       console.error("Activity logging failed:", logError);
     }
     
+    // 사용자 친화적 에러 메시지 처리
     const errorMessage = error instanceof Error ? error.message : "이미지 생성 중 오류가 발생했습니다";
+    
+    if (errorMessage === 'CONTENT_POLICY_VIOLATION') {
+      return ApiResponse.error("이용정책에 맞지 않은 이미지 생성 요청입니다! 건전한 콘텐츠로 다시 시도해 주세요.", 400);
+    }
+    
+    if (errorMessage === 'COPYRIGHT_VIOLATION') {
+      return ApiResponse.error("저작권 침해 우려로 이미지를 생성할 수 없습니다. 다른 내용으로 시도해 주세요.", 400);
+    }
+    
+    if (errorMessage.includes('PROHIBITED_CONTENT') || errorMessage.includes('SAFETY')) {
+      return ApiResponse.error("이용정책에 맞지 않은 이미지 생성 요청입니다! 건전한 콘텐츠로 다시 시도해 주세요.", 400);
+    }
+    
     return ApiResponse.error(errorMessage, 500, String(error));
   }
 });

@@ -1,0 +1,85 @@
+{
+  "name": "젠툰(GenToon) - AI 웹툰 제작 플랫폼",
+  "short_name": "젠툰",
+  "description": "AI로 쉽고 빠르게 웹툰을 제작하세요. 캐릭터 일관성 유지, 자동 스토리 생성, 인스타그램 웹툰 최적화",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
+  "lang": "ko",
+  "categories": ["productivity", "design", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "웹툰 제작 시작",
+      "short_name": "웹툰 제작",
+      "description": "새로운 웹툰 프로젝트를 시작합니다",
+      "url": "/studio",
+      "icons": [
+        {
+          "src": "/icons/shortcut-studio.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "내 프로젝트",
+      "short_name": "프로젝트",
+      "description": "저장된 웹툰 프로젝트를 확인합니다",
+      "url": "/projects",
+      "icons": [
+        {
+          "src": "/icons/shortcut-projects.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "젠툰 웹툰 제작 화면"
+    },
+    {
+      "src": "/screenshots/mobile-1.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "젠툰 모바일 화면"
+    }
+  ]
+}

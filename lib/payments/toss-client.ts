@@ -12,7 +12,7 @@ export async function getTossClient() {
   return tossPayments;
 }
 
-// plan-config.ts의 PLAN_CONFIGS 사용
+// plan-config.ts의 PLAN_CONFIGS 사용 (새로운 4티어 구조)
 export const SUBSCRIPTION_PLANS = {
   FREE: {
     id: "FREE" as const,
@@ -22,6 +22,15 @@ export const SUBSCRIPTION_PLANS = {
     characters: PLAN_CONFIGS.FREE.maxCharacters,
     maxElements: PLAN_CONFIGS.FREE.maxElements,
     description: PLAN_CONFIGS.FREE.features.join(', '),
+  },
+  STARTER: {
+    id: "STARTER" as const,
+    name: PLAN_CONFIGS.STARTER.name,
+    price: PLAN_CONFIGS.STARTER.price,
+    tokens: PLAN_CONFIGS.STARTER.platformTokens,
+    characters: PLAN_CONFIGS.STARTER.maxCharacters,
+    maxElements: PLAN_CONFIGS.STARTER.maxElements,
+    description: PLAN_CONFIGS.STARTER.features.join(', '),
   },
   PRO: {
     id: "PRO" as const,

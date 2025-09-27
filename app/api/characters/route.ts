@@ -82,9 +82,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 구독 정보 확인 (캐릭터 개수 제한)
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: userData.id }
-    });
+    const { data: subscription } = await supabase
+      .from('subscription')
+      .select('plan')
+      .eq('userId', userData.id)
+      .single();
 
     const { count: currentCharacterCount } = await supabase
       .from('character')

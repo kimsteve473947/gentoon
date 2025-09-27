@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 interface CharacterLimitModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentPlan: 'FREE' | 'PRO' | 'PREMIUM';
+  currentPlan: 'FREE' | 'STARTER' | 'PRO' | 'PREMIUM';
   currentCount: number;
   maxCount: number;
 }
@@ -42,11 +42,21 @@ const PLAN_CONFIG = {
     textColor: 'text-gray-600',
     badgeColor: 'bg-gray-100 text-gray-700'
   },
+  STARTER: {
+    name: '스타터',
+    price: '₩29,000',
+    characters: 5,
+    images: 270,
+    icon: Users,
+    color: 'from-blue-500 to-blue-600',
+    textColor: 'text-blue-600',
+    badgeColor: 'bg-blue-100 text-blue-700'
+  },
   PRO: {
     name: '프로',
-    price: '₩30,000',
-    characters: 7,
-    images: 310,
+    price: '₩59,000',
+    characters: 10,
+    images: 540,
     icon: Zap,
     color: 'from-purple-500 to-purple-600',
     textColor: 'text-purple-600',
@@ -55,9 +65,9 @@ const PLAN_CONFIG = {
   },
   PREMIUM: {
     name: '프리미엄',
-    price: '₩100,000',
-    characters: 15,
-    images: 1163,
+    price: '₩99,000',
+    characters: 20,
+    images: 930,
     icon: Crown,
     color: 'from-amber-500 to-orange-500',
     textColor: 'text-amber-600',

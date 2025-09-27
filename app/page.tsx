@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from "react";
+import { Metadata } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles, Zap, Shield, Star, Users, Check, Coins, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { InquiryWidget } from "@/components/ui/inquiry-widget";
 import Footer from "@/components/Footer";
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -266,82 +268,21 @@ export default function Home() {
           </p>
           
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
-              <CardHeader>
-                <CardTitle>무료 AI 디자이너</CardTitle>
-                <CardDescription>🎨 서비스 체험용 - 실력 검증해보세요</CardDescription>
-                <div className="text-3xl font-bold mt-4">₩0</div>
-                <div className="text-sm text-muted-foreground">이미지 생성 무료 제공</div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">무료 체험용</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">캐릭터 1개 등록</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">무료 AI 디자이너</span>
-                  </li>
-                </ul>
-                <Button 
-                  className="w-full mt-6 rounded-full" 
-                  variant="outline" 
-                  onClick={handleStartClick}
-                  disabled={isLoggedIn === null}
-                >
-                  {isLoggedIn === null ? "로딩 중..." : isLoggedIn ? "제작 스튜디오 열기" : "🎨 무료 AI 디자이너 고용"}
-                </Button>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-purple-500 relative cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-3 py-1 rounded-full">
-                👑 97% 절약
+            <Card className="border-blue-500 relative cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs px-3 py-1 rounded-full">
+                🎨 개인 창작자 추천
               </div>
               <CardHeader>
-                <CardTitle>프로 AI 디자이너</CardTitle>
-                <CardDescription>💼 이미지당 77원 - 마케팅팀 최고 선택</CardDescription>
-                <div className="text-3xl font-bold mt-4">₩30,000<span className="text-base font-normal">/월</span></div>
-                <div className="text-sm text-green-600 font-semibold">월 3만원으로 AI 디자이너 고용</div>
+                <CardTitle>스타터</CardTitle>
+                <CardDescription>🎨 개인 창작자를 위한 맞춤 플랜</CardDescription>
+                <div className="text-3xl font-bold mt-4">₩29,000<span className="text-base font-normal">/월</span></div>
+                <div className="text-sm text-green-600 font-semibold">개인 창작자에게 적합해요</div>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">인스타툰 30~40편 생성</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">캐릭터 3개 등록</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">5GB 파일 저장 공간</span>
-                  </li>
-                </ul>
-                <Button className="w-full mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full" asChild>
-                  <Link href="/sign-in">💼 프로 AI 디자이너 고용</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
-              <CardHeader>
-                <CardTitle>엔터프라이즈 AI 팀</CardTitle>
-                <CardDescription>🏢 이미지당 65원 - 하드유저 최고 선택</CardDescription>
-                <div className="text-3xl font-bold mt-4">₩100,000<span className="text-base font-normal">/월</span></div>
-                <div className="text-sm text-green-600 font-semibold">월 10만원으로 AI 디자인팀 고용</div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">인스타툰 120~160편 생성</span>
+                    <span className="text-sm">월 270장 이미지 생성</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
@@ -349,11 +290,73 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">3GB 스토리지</span>
+                  </li>
+                </ul>
+                <Button className="w-full mt-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-full" asChild>
+                  <Link href="/sign-in">🎨 스타터 시작하기</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-purple-500 relative cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-3 py-1 rounded-full">
+                💼 개인 사업자 추천
+              </div>
+              <CardHeader>
+                <CardTitle>프로</CardTitle>
+                <CardDescription>💼 개인 사업자를 위한 전문 플랜</CardDescription>
+                <div className="text-3xl font-bold mt-4">₩59,000<span className="text-base font-normal">/월</span></div>
+                <div className="text-sm text-green-600 font-semibold">개인 사업자에게 적합해요</div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">월 540장 이미지 생성</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">캐릭터 10개 등록</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">8GB 스토리지</span>
+                  </li>
+                </ul>
+                <Button className="w-full mt-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full" asChild>
+                  <Link href="/sign-in">💼 프로 시작하기</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-amber-500 relative cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/pricing')}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs px-3 py-1 rounded-full">
+                🏢 기업 추천
+              </div>
+              <CardHeader>
+                <CardTitle>프리미엄</CardTitle>
+                <CardDescription>🏢 기업을 위한 최고급 플랜</CardDescription>
+                <div className="text-3xl font-bold mt-4">₩99,000<span className="text-base font-normal">/월</span></div>
+                <div className="text-sm text-green-600 font-semibold">기업에게 적합해요</div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">월 930장 이미지 생성</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">캐릭터 20개 등록</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500" />
                     <span className="text-sm">20GB 파일 저장 공간</span>
                   </li>
                 </ul>
-                <Button className="w-full mt-6 rounded-full" variant="outline" asChild>
-                  <Link href="/sign-in">🏢 AI 디자이너팀 구성</Link>
+                <Button className="w-full mt-6 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 rounded-full" asChild>
+                  <Link href="/sign-in">🏢 프리미엄 시작하기</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -388,6 +391,9 @@ export default function Home() {
       </section>
 
       <Footer />
+
+      {/* 문의하기 위젯 */}
+      <InquiryWidget />
 
       {/* 로그인 모달 - 로그인 안된 사용자에게만 표시 */}
       {!isLoggedIn && (

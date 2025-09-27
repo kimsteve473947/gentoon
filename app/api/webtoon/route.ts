@@ -21,45 +21,31 @@ export async function GET(request: NextRequest) {
 
     const offset = ((filters.page || 1) - 1) * (filters.limit || 12);
 
-    // 기본 쿼리 구성
+    // 기본 쿼리 구성 - project 테이블 사용
     let query = supabase
-      .from('webtoon_projects')
+      .from('project')
       .select('*')
-      .eq('published', true);
+      .eq('status', 'PUBLISHED')
+      .eq('isPublic', true)
+      .is('deletedAt', null);
 
     let countQuery = supabase
-      .from('webtoon_projects')
+      .from('project')
       .select('*', { count: 'exact', head: true })
-      .eq('published', true);
+      .eq('status', 'PUBLISHED')
+      .eq('isPublic', true)
+      .is('deletedAt', null);
 
-    // 카테고리 필터
-    if (filters.category && filters.category !== 'all') {
-      query = query.eq('category', filters.category);
-      countQuery = countQuery.eq('category', filters.category);
-    }
-
-    // 추천작 필터
-    if (filters.featured) {
-      query = query.eq('featured', true);
-      countQuery = countQuery.eq('featured', true);
-    }
-
-    // 클라이언트 필터
-    if (filters.client) {
-      query = query.ilike('client', `%${filters.client}%`);
-      countQuery = countQuery.ilike('client', `%${filters.client}%`);
-    }
-
-    // 검색 기능
+    // 검색 기능 - project 테이블 필드에 맞게 수정
     if (filters.search) {
       const searchTerm = filters.search.trim();
-      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,client.ilike.%${searchTerm}%`);
-      countQuery = countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,client.ilike.%${searchTerm}%`);
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      countQuery = countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
     }
 
-    // 정렬
-    const validSortFields = ['created_at', 'views', 'likes', 'title'];
-    const actualSortBy = validSortFields.includes(filters.sortBy || '') ? filters.sortBy : 'created_at';
+    // 정렬 - project 테이블 필드에 맞게 수정
+    const validSortFields = ['createdAt', 'lastEditedAt', 'title'];
+    const actualSortBy = validSortFields.includes(filters.sortBy || '') ? filters.sortBy : 'createdAt';
     const actualSortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc';
     
     query = query.order(actualSortBy!, { ascending: actualSortOrder === 'asc' });
@@ -128,29 +114,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     
-    // 필수 필드 검증
-    if (!body.title || !body.description || !body.client || !body.category) {
+    // 필수 필드 검증 - project 테이블에 맞게 수정
+    if (!body.title || !body.userId) {
       return NextResponse.json({
         success: false,
-        error: 'Missing required fields: title, description, client, category'
+        error: 'Missing required fields: title, userId'
       }, { status: 400 });
     }
 
-    // 프로젝트 생성
+    // 프로젝트 생성 - project 테이블에 맞게 수정
     const { data: project, error } = await supabase
-      .from('webtoon_projects')
+      .from('project')
       .insert({
         title: body.title,
-        description: body.description,
-        client: body.client,
-        category: body.category,
-        thumbnail_url: body.thumbnail_url || null,
-        images: body.images || [],
-        featured: body.featured || false,
-        published: body.published || false,
-        tags: body.tags || [],
-        episode_count: body.episode_count || 1,
-        creator_id: body.creator_id || null
+        description: body.description || '',
+        userId: body.userId,
+        thumbnailUrl: body.thumbnailUrl || null,
+        status: body.published ? 'PUBLISHED' : 'DRAFT',
+        isPublic: body.published || false
       })
       .select()
       .single();

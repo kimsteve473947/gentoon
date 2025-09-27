@@ -12,11 +12,13 @@ import {
   Check,
   Loader2,
   MoreHorizontal,
-  User
+  User,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createBrowserClient } from '@supabase/ssr';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AddElementModal } from "./AddElementModal";
 
 // 저장된 요소 인터페이스
 interface StoredElement {
@@ -54,6 +56,7 @@ export function ImageElementSelector({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [limitInfo, setLimitInfo] = useState<{
     currentCount: number;
     maxElements: number;
@@ -326,7 +329,7 @@ export function ImageElementSelector({
         )}
       </div>
 
-      {/* 새 요소 추가 버튼 (캐릭터와 동일한 스타일) */}
+      {/* 새 요소 추가 버튼 (상세 폼 방식) */}
       <Button
         variant="outline"
         size="sm"
@@ -337,7 +340,7 @@ export function ImageElementSelector({
             ? "border-red-300 text-red-600 hover:border-red-300 hover:text-red-600" 
             : "border-slate-300 text-slate-600 hover:border-purple-300 hover:text-purple-600"
         )}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => setShowAddModal(true)}
       >
         {uploading ? (
           <>
@@ -351,13 +354,22 @@ export function ImageElementSelector({
           </>
         ) : (
           <>
-            <Plus className="h-4 w-4 mr-2" />
+            <Package className="h-4 w-4 mr-2" />
             새 요소 추가
           </>
         )}
       </Button>
 
-      {/* 숨겨진 파일 입력 */}
+      {/* 요소 추가 모달 */}
+      <AddElementModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onElementAdded={() => {
+          loadStoredElements();
+        }}
+      />
+
+      {/* 숨겨진 파일 입력 (기존 간단 업로드용 - 사용 안함) */}
       <input
         ref={fileInputRef}
         type="file"

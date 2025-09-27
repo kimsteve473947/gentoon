@@ -266,7 +266,7 @@ export function Header() {
                 </DropdownMenuItem>
                 {isAdmin() && (
                   <DropdownMenuItem asChild>
-                    <Link href="/admin" className="cursor-pointer text-red-600">
+                    <Link href="/admin-473947" className="cursor-pointer text-red-600">
                       <Shield className="mr-2 h-4 w-4" />
                       <span>관리자 대시보드</span>
                     </Link>

@@ -1,12 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
 
-type SubscriptionPlan = 'FREE' | 'PRO' | 'PREMIUM' | 'ADMIN';
+type SubscriptionPlan = 'FREE' | 'STARTER' | 'PRO' | 'PREMIUM' | 'ADMIN';
 
-// 플랜별 토큰 제한 (Prisma 스키마와 일치)
+// 중앙 설정에서 토큰 제한 가져오기
+import { PLAN_CONFIGS } from '@/lib/subscription/plan-config';
+
 export const PLAN_TOKEN_LIMITS = {
-  FREE: 10,
-  PRO: 500000,     // 50만
-  PREMIUM: 2000000, // 200만
+  FREE: PLAN_CONFIGS.FREE.platformTokens,
+  STARTER: PLAN_CONFIGS.STARTER.platformTokens,
+  PRO: PLAN_CONFIGS.PRO.platformTokens,
+  PREMIUM: PLAN_CONFIGS.PREMIUM.platformTokens,
   ADMIN: 10000000  // 1000만 (관리자용)
 } as const;
 

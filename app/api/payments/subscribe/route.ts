@@ -9,15 +9,17 @@ import { PLAN_CONFIGS } from "@/lib/subscription/plan-config";
 
 // const tossPayments = new TossPayments(process.env.TOSS_SECRET_KEY!);
 
-// plan-config.ts의 PLAN_CONFIGS 사용
+// plan-config.ts의 PLAN_CONFIGS 사용 (새로운 4티어 구조)
 const PLAN_PRICES = {
   [SubscriptionPlan.FREE]: PLAN_CONFIGS.FREE.price,
+  [SubscriptionPlan.STARTER]: PLAN_CONFIGS.STARTER.price,
   [SubscriptionPlan.PRO]: PLAN_CONFIGS.PRO.price,
   [SubscriptionPlan.PREMIUM]: PLAN_CONFIGS.PREMIUM.price,
 };
 
 const PLAN_TOKENS = {
   [SubscriptionPlan.FREE]: PLAN_CONFIGS.FREE.platformTokens,
+  [SubscriptionPlan.STARTER]: PLAN_CONFIGS.STARTER.platformTokens,
   [SubscriptionPlan.PRO]: PLAN_CONFIGS.PRO.platformTokens,
   [SubscriptionPlan.PREMIUM]: PLAN_CONFIGS.PREMIUM.platformTokens,
 };

@@ -91,6 +91,28 @@ export default function MyInfoPage() {
     }
   }, [selectedMenu]);
 
+  // Handle success/error messages from URL params
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentRegistered = urlParams.get('payment_registered');
+    const error = urlParams.get('error');
+
+    if (paymentRegistered === 'true') {
+      alert('✅ 결제 수단이 성공적으로 등록되었습니다!');
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings?tab=subscription');
+      loadPaymentData(); // Refresh payment data
+    } else if (error === 'billing_failed') {
+      alert('❌ 결제 수단 등록에 실패했습니다. 다시 시도해주세요.');
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings?tab=subscription');
+    } else if (error === 'billing_registration_failed') {
+      alert('❌ 결제 수단 등록 처리 중 오류가 발생했습니다.');
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings?tab=subscription');
+    }
+  }, []);
+
   const loadPaymentData = async () => {
     try {
       setPaymentLoading(true);
@@ -211,8 +233,32 @@ export default function MyInfoPage() {
   };
 
   // Payment-related functions
-  const handleAddCard = () => {
-    setShowCardModal(true);
+  const handleAddCard = async () => {
+    if (!userData?.id) {
+      alert('사용자 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    setAddingCard(true);
+    
+    try {
+      // 토스페이먼츠 SDK 초기화
+      const tossPayments = (window as any).TossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY);
+      
+      // 고유한 customerKey 생성
+      const customerKey = `customer_${userData.id}_${Date.now()}`;
+      
+      // 빌링키 발급 요청 (결제 수단 등록만)
+      await tossPayments.requestBillingAuth('카드', {
+        customerKey,
+        successUrl: `${window.location.origin}/api/payments/billing-key-register`,
+        failUrl: `${window.location.origin}/settings?tab=subscription&error=billing_failed`
+      });
+    } catch (error) {
+      console.error('결제수단 등록 실패:', error);
+      alert('결제수단 등록 중 오류가 발생했습니다.');
+      setAddingCard(false);
+    }
   };
 
   const handleCardRegistrationSuccess = async () => {
@@ -420,9 +466,14 @@ export default function MyInfoPage() {
       icon: Building,
     },
     {
-      id: 'subscription',
-      title: '결제 정보 설정',
+      id: 'payment',
+      title: '결제수단 관리',
       icon: CreditCard,
+    },
+    {
+      id: 'subscription',
+      title: '구독 관리',
+      icon: Crown,
     },
     {
       id: 'billing',
@@ -462,16 +513,96 @@ export default function MyInfoPage() {
               <Crown className="h-5 w-5 text-purple-600" />
               <h3 className="text-lg font-semibold">사용중인 요금제</h3>
             </div>
-            <div className="text-center py-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                현재 {subscription?.plan ? getPlanName(subscription.plan) : 'Free'} 요금제를 이용중입니다.
-              </h3>
-              <div className="flex justify-center items-center gap-2">
-                <Crown className="h-5 w-5 text-yellow-500" />
-                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 px-3 py-1">
-                  {subscription?.plan ? getPlanName(subscription.plan) : 'Free'} 체험판 사용
-                </Badge>
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  현재 {subscription?.plan ? getPlanName(subscription.plan) : 'Free'} 요금제를 이용중입니다.
+                </h3>
+                <div className="flex justify-center items-center gap-2">
+                  <Crown className="h-5 w-5 text-yellow-500" />
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 px-3 py-1">
+                    {subscription?.plan ? getPlanName(subscription.plan) : 'Free'} 플랜
+                  </Badge>
+                </div>
               </div>
+              
+              {/* 구독 정보 */}
+              {subscription?.plan && subscription.plan !== 'FREE' && (
+                <div className="border-t pt-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">구독 시작일</span>
+                      <p className="font-medium text-gray-900">
+                        {subscription.currentPeriodStart 
+                          ? new Date(subscription.currentPeriodStart).toLocaleDateString('ko-KR')
+                          : '정보 없음'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">다음 결제일</span>
+                      <p className="font-medium text-gray-900">
+                        {subscription.currentPeriodEnd 
+                          ? new Date(subscription.currentPeriodEnd).toLocaleDateString('ko-KR')
+                          : '정보 없음'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* 구독 상태 */}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <div>
+                      <span className="text-gray-500 text-sm">구독 상태</span>
+                      <p className="font-medium">
+                        {subscription.cancelAtPeriodEnd ? (
+                          <span className="text-red-600">기간 만료 시 취소 예정</span>
+                        ) : (
+                          <span className="text-green-600">활성</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    {!subscription.cancelAtPeriodEnd && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          if (confirm('구독을 취소하시겠습니까? 현재 결제 기간이 끝나면 자동으로 무료 플랜으로 변경됩니다.')) {
+                            try {
+                              const response = await fetch('/api/settings', {
+                                method: 'DELETE'
+                              });
+                              const result = await response.json();
+                              if (result.success) {
+                                alert('구독이 취소되었습니다. 현재 결제 기간까지는 계속 이용하실 수 있습니다.');
+                                window.location.reload();
+                              } else {
+                                alert('구독 취소 실패: ' + result.error);
+                              }
+                            } catch (error) {
+                              alert('구독 취소 중 오류가 발생했습니다.');
+                            }
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                      >
+                        구독 취소
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 무료 플랜인 경우 업그레이드 유도 */}
+              {(!subscription?.plan || subscription.plan === 'FREE') && (
+                <div className="text-center pt-4 border-t">
+                  <p className="text-gray-600 mb-3 text-sm">더 많은 기능을 이용하려면 유료 플랜으로 업그레이드하세요</p>
+                  <Link href="/pricing">
+                    <Button className="bg-purple-600 hover:bg-purple-700">
+                      플랜 업그레이드
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -494,9 +625,17 @@ export default function MyInfoPage() {
                     <p className="text-gray-600 mb-3">등록된 결제 수단이 없습니다.</p>
                     <Button 
                       onClick={handleAddCard} 
+                      disabled={addingCard}
                       className="mt-2"
                     >
-                      결제 수단 등록
+                      {addingCard ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          등록 중...
+                        </>
+                      ) : (
+                        '결제 수단 등록'
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -540,6 +679,18 @@ export default function MyInfoPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => {
+                              if (confirm('이 카드를 새 카드로 교체하시겠습니까?')) {
+                                handleAddCard();
+                              }
+                            }}
+                            className="text-blue-600 hover:text-blue-700 px-2"
+                          >
+                            변경
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleRemoveCard(method.id)}
                             className="text-red-600 hover:text-red-700 px-2"
                           >
@@ -553,10 +704,20 @@ export default function MyInfoPage() {
                   <Button 
                     variant="outline" 
                     onClick={handleAddCard}
+                    disabled={addingCard}
                     className="w-full"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    새 결제 수단 추가
+                    {addingCard ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        등록 중...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        새 결제 수단 추가
+                      </>
+                    )}
                   </Button>
                 </>
               )}
@@ -966,6 +1127,21 @@ export default function MyInfoPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">워크스페이스 설정</h1>
             <p className="text-gray-600">워크스페이스 설정 페이지입니다.</p>
+          </div>
+        );
+      case 'payment':
+        return (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">결제수단 관리</h1>
+            <div className="space-y-6">
+              {/* PaymentMethodSettings 컴포넌트를 여기에 렌더링 */}
+              <div className="bg-white rounded-lg border p-6">
+                <p className="text-gray-600 mb-4">결제수단 관리 기능을 준비 중입니다.</p>
+                <p className="text-sm text-gray-500">
+                  자동 결제를 위한 카드 등록, 결제수단 변경, 결제 내역 조회 등의 기능이 제공됩니다.
+                </p>
+              </div>
+            </div>
           </div>
         );
       case 'subscription':

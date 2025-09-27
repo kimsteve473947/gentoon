@@ -44,12 +44,13 @@ export async function trackStorageUsage(
         .eq('userId', userId)
         .single();
 
-      let maxBytes = 1073741824; // 1GB default
+      let maxBytes = 314572800; // 300MB default (FREE)
       switch (subscription?.plan) {
-        case 'FREE': maxBytes = 104857600; break; // 100MB
-        case 'PRO': maxBytes = 5368709120; break; // 5GB
+        case 'FREE': maxBytes = 314572800; break; // 300MB
+        case 'STARTER': maxBytes = 3221225472; break; // 3GB
+        case 'PRO': maxBytes = 8589934592; break; // 8GB
         case 'PREMIUM': maxBytes = 21474836480; break; // 20GB
-        case 'ADMIN': maxBytes = 107374182400; break; // 100GB
+        case 'ADMIN': maxBytes = 1099511627776; break; // 1TB
       }
 
       const { data: newStorage, error: insertError } = await supabase

@@ -71,7 +71,7 @@ export default function CouponDetailModal({
     try {
       setLoading(true);
       
-      const response = await fetch(`/api/admin/coupons/${couponId}`);
+      const response = await fetch(`/api/admin-473947/coupons/${couponId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -92,7 +92,7 @@ export default function CouponDetailModal({
     if (!couponId) return;
 
     try {
-      const response = await fetch(`/api/admin/coupons/${couponId}/usage`);
+      const response = await fetch(`/api/admin-473947/coupons/${couponId}/usage`);
       const data = await response.json();
 
       if (data.success) {

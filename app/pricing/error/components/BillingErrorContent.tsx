@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { XCircle, RefreshCw, ArrowLeft, AlertTriangle, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -70,10 +71,16 @@ const ERROR_CODES: ErrorCodeMap = {
 export default function BillingErrorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [currentTime, setCurrentTime] = useState<string>('');
   
   const code = searchParams.get('code') || searchParams.get('errorCode');
   const message = searchParams.get('message') || searchParams.get('errorMsg');
   const orderId = searchParams.get('orderId');
+
+  // 클라이언트에서만 시간 설정 (Hydration 오류 방지)
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleString('ko-KR'));
+  }, []);
 
   const errorInfo = code && ERROR_CODES[code] ? ERROR_CODES[code] : {
     title: '결제 중 오류가 발생했습니다',
@@ -180,7 +187,7 @@ export default function BillingErrorContent() {
               )}
               <div className="flex justify-between">
                 <span className="text-gray-500">발생 시간:</span>
-                <span>{new Date().toLocaleString('ko-KR')}</span>
+                <span>{currentTime || '로딩 중...'}</span>
               </div>
             </div>
 

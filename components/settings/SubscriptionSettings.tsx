@@ -38,26 +38,33 @@ export function SubscriptionSettings({
 
   const getPlanDetails = (plan: string) => {
     switch (plan) {
+      case 'STARTER':
+        return {
+          name: '스타터',
+          price: '₩29,000',
+          color: 'bg-blue-100 text-blue-800',
+          features: ['월 270장 이미지 생성', '캐릭터 5개 등록', '개인 사용자에게 적합해요']
+        };
       case 'PRO':
         return {
-          name: 'Pro',
-          price: '₩30,000',
+          name: '프로',
+          price: '₩59,000',
           color: 'bg-purple-100 text-purple-800',
-          features: ['인스타툰 30편 생성', 'AI 대본 생성 (대용량)', '캐릭터 7개 등록']
+          features: ['월 540장 이미지 생성', '캐릭터 10개 등록', '기업 실무자에게 적합해요']
         };
       case 'PREMIUM':
         return {
-          name: 'Premium',
-          price: '₩100,000',
+          name: '프리미엄',
+          price: '₩99,000',
           color: 'bg-amber-100 text-amber-800',
-          features: ['인스타툰 120편~160편 생성', 'AI 대본 생성 (초대용량)', '캐릭터 15개 등록']
+          features: ['월 930장 이미지 생성', '캐릭터 20개 등록', '전문 제작자에게 적합해요']
         };
       default:
         return {
-          name: 'Free',
+          name: '무료',
           price: '₩0',
           color: 'bg-gray-100 text-gray-800',
-          features: ['무료체험용', 'AI 대본 생성 Demo', '캐릭터 2개 등록']
+          features: ['월 8장 이미지 생성', '캐릭터 2개 등록', '기본 템플릿 사용']
         };
     }
   };
@@ -183,6 +190,14 @@ export function SubscriptionSettings({
             </Link>
           ) : (
             <>
+              <Button 
+                variant="outline" 
+                className="border-gray-300 hover:bg-gray-50"
+                onClick={() => window.location.href = '/settings?tab=payment'}
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                결제수단 관리
+              </Button>
               <Link href="/pricing" className="flex-1">
                 <Button variant="outline" className="w-full border-gray-300 hover:bg-gray-50">
                   <RefreshCw className="h-4 w-4 mr-2" />

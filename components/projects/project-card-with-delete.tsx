@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo, memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2, Eye, Clock } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { LoadingOverlay } from '@/components/ui/loading-overlay';
@@ -17,10 +18,20 @@ interface ProjectCardWithDeleteProps {
     lastEdited: string;
   };
   onDelete?: (projectId: string) => void;
+  // 🚀 일괄 삭제 관련 props
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (selected: boolean) => void;
 }
 
 // 🚀 최적화된 프로젝트 카드 컴포넌트
-export const ProjectCardWithDelete = memo(({ project, onDelete }: ProjectCardWithDeleteProps) => {
+export const ProjectCardWithDelete = memo(({ 
+  project, 
+  onDelete, 
+  isSelectMode = false,
+  isSelected = false,
+  onSelect 
+}: ProjectCardWithDeleteProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { showSuccess } = useToast();
 
@@ -90,23 +101,36 @@ export const ProjectCardWithDelete = memo(({ project, onDelete }: ProjectCardWit
     createActionItems.moveToTrash(handleDelete),
   ], [handleDelete]);
 
-  // 🚀 링크 클릭 핸들러 최적화
+  // 🚀 체크박스 선택 핸들러
+  const handleSelectChange = useCallback((checked: boolean) => {
+    if (onSelect) {
+      onSelect(checked);
+    }
+  }, [onSelect]);
+
+  // 🚀 링크 클릭 핸들러 최적화 - 선택 모드일 때는 링크 비활성화
   const handleCardClick = useCallback((e: React.MouseEvent) => {
     if (isProcessing) {
       e.preventDefault();
       e.stopPropagation();
     }
-  }, [isProcessing]);
+    // 선택 모드일 때는 카드 클릭 시 체크박스 토글
+    if (isSelectMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSelectChange(!isSelected);
+    }
+  }, [isProcessing, isSelectMode, isSelected, handleSelectChange]);
 
   return (
     <>
       <Card 
         className={`group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] h-64 flex flex-col ${
           isProcessing ? 'opacity-50 pointer-events-none' : ''
-        }`}
+        } ${isSelected ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
       >
         <Link 
-          href={`/studio?projectId=${project.id}`} 
+          href={isSelectMode ? '#' : `/studio?projectId=${project.id}`} 
           className="flex-1 flex flex-col"
           onClick={handleCardClick}
         >
@@ -126,6 +150,19 @@ export const ProjectCardWithDelete = memo(({ project, onDelete }: ProjectCardWit
                 <div className="text-center text-purple-400">
                   <Eye className="h-8 w-8 mx-auto mb-2" />
                   <p className="text-sm">썸네일 없음</p>
+                </div>
+              </div>
+            )}
+            
+            {/* 선택 모드일 때 체크박스 오버레이 */}
+            {isSelectMode && (
+              <div className="absolute top-2 left-2 z-10">
+                <div className="bg-white/90 backdrop-blur-sm rounded-md p-1">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={handleSelectChange}
+                    className="w-5 h-5"
+                  />
                 </div>
               </div>
             )}
@@ -155,11 +192,13 @@ export const ProjectCardWithDelete = memo(({ project, onDelete }: ProjectCardWit
           </CardContent>
         </Link>
 
-        {/* 🚀 간소화된 액션 버튼 - 호버 시에만 표시 */}
-        <CardActionDropdown 
-          actions={actionItems}
-          disabled={isProcessing}
-        />
+        {/* 🚀 간소화된 액션 버튼 - 호버 시에만 표시 (선택 모드가 아닐 때만) */}
+        {!isSelectMode && (
+          <CardActionDropdown 
+            actions={actionItems}
+            disabled={isProcessing}
+          />
+        )}
       </Card>
     </>
   );

@@ -1,0 +1,41 @@
+-- font_families 배치 27
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'fa56b3e0-31fd-434c-bc0a-275f5f67dc8d', '위메프체', 'WeMakePrice', 'WeMakePrice', 'decorative', '위메프체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/480', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '1fae36bd-0c78-46eb-b33d-b65c9bc959b1', '영양군 음식디미방체', 'YeongyanggunEumsikdimibang', 'YeongyanggunEumsikdimibang', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/483', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '9fe4f50a-4243-467e-9957-43a84a98829e', '코트라 고딕체', 'KotraGothic', 'KotraGothic', 'gothic', '코트라 고딕체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/484', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '3c65b8d2-5cea-4067-8cbe-431e5d360fb6', '코트라 볼드체', 'KotraBold', 'KotraBold', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/485', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '0e416f10-be3b-402e-a79b-baa9b31c351d', '코트라 손글씨체', 'KotraHandwritingFont', 'KotraHandwritingFont', 'handwriting', '코트라 손글씨체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/486', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '40f87698-44c0-4f8b-b946-2657e2b93d28', '마루 부리', 'MaruBuri', 'MaruBuri', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/487', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'b719e4d2-bd61-4179-835e-3ca184551581', '잘풀리는오늘체', 'JalpulrineunOneul', 'JalpulrineunOneul', 'decorative', '잘풀리는오늘체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/497', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'edd69068-56ad-433d-8052-b1a6b710773f', '잘풀리는하루체', 'JalpulrineunHaruche', 'JalpulrineunHaruche', 'decorative', '잘풀리는하루체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/498', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '833b7ce8-7304-4c60-94dd-cf56a71846f0', '을지로10년후체', 'Euljiro10YearsLater', 'Euljiro10YearsLater', 'decorative', '을지로10년후체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/499', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '762019c1-0716-40a4-9ed1-bbced5394cf8', '빙그레체', 'Binggre', 'Binggre', 'decorative', '빙그레체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/5', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '97e6c7da-407c-428e-99d7-30919dde9783', 'Y 너만을 비춤체', 'YOnlyYouShine', 'YOnlyYouShine', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/500', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'afb6f5f7-98d1-467e-92e3-5bb40e4565d1', '이랜드 초이스체', 'ELandChoice', 'ELandChoice', 'decorative', '이랜드 초이스체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/502', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f449e104-07e8-4618-83c3-38e44323be63', '이랜드 나이스체', 'ELandNice', 'ELandNice', 'decorative', '이랜드 나이스체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/504', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'a7977f2a-108e-4984-96ba-d65927b95fe0', '솔뫼 김대건체', 'SolmoeKimDaegeon', 'SolmoeKimDaegeon', 'decorative', '솔뫼 김대건체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/506', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'ceb76d10-a9b0-462a-9da2-982b9ff0a408', '산돌 삼립호빵체 Basic', 'SandollSamlipHobbangBasic', 'SandollSamlipHobbangBasic', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/507', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '5223ef3f-a13f-43b7-a6f1-210a24e1be00', '산돌 삼립호빵체 Outline', 'SandollSamlipHobbangOutline', 'SandollSamlipHobbangOutline', 'decorative', '산돌 삼립호빵체 Outline폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/508', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '8845b4b5-3e1c-4206-9079-8fd0a571ffbb', '아인맘 손글씨', 'AinmamHandwriting', 'AinmamHandwriting', 'handwriting', '아인맘 손글씨폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/510', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '386ac0f0-4385-4f16-a8e0-6d5f7e84bc58', '암스테르담', 'Amsterdam', 'Amsterdam', 'decorative', '암스테르담폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/511', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'd43e183e-cfb7-4b6d-86bb-7d9e91cf5b3a', '안쌍체', 'Anssang', 'Anssang', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/512', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f2782f82-1fe6-4528-a44f-72d0846a8d16', '아기사랑체', 'Agisarang', 'Agisarang', 'decorative', '아기사랑체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/513', NULL, 0, true, false, NOW(), NOW() );

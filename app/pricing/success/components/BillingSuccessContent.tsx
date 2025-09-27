@@ -19,7 +19,6 @@ export default function BillingSuccessContent() {
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          router.push("/pricing");
           return 0;
         }
         return prev - 1;
@@ -27,7 +26,14 @@ export default function BillingSuccessContent() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [router]);
+  }, []);
+
+  // 별도 useEffect로 리다이렉트 처리
+  useEffect(() => {
+    if (countdown === 0) {
+      router.push("/pricing");
+    }
+  }, [countdown, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">

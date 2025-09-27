@@ -1,0 +1,31 @@
+-- font_families 배치 42
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'e2aa3ac3-3e92-4451-92dd-cb242649ef87', '평창체', 'Pyeongchang', 'Pyeongchang', 'decorative', '평창체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/948', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f7a0861f-2532-42b1-8365-9f0108ba4a41', '신비는일곱살', 'ShinbiIsSevenYearsOld', 'ShinbiIsSevenYearsOld', 'decorative', '신비는일곱살폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/95', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '225373ea-3f30-435d-8d52-46af69500bd2', '평창평화체', 'PyeongchangPeace', 'PyeongchangPeace', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/950', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '28b8abf8-98a6-4a33-9f18-bb35e420921b', '신라문화체', 'Shilla', 'Shilla', 'decorative', '신라문화체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/952', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'b1ca302d-297b-4865-b70e-e409d94030f4', '신라고딕체', 'SillaGothic', 'SillaGothic', 'gothic', '신라고딕체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/954', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '423171d6-fbbd-450b-a014-6b6172f350ae', '울산중구전용서체', 'UlsanJungGuExclusiveFont', 'UlsanJungGuExclusiveFont', 'decorative', '울산중구전용서체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/955', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '9a278b62-d3ab-44ed-a06e-d4c7f4610f27', '윈도한글', 'WindowsKorean', 'WindowsKorean', 'decorative', '윈도한글폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/956', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '53bf9773-5757-4bf8-ad31-2480ed35dc87', 'HBIOS-SYS', 'HbiosSys', 'HbiosSys', 'decorative', 'HBIOS-SYS폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/960', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c4ffb0c5-7861-4b13-8b30-326c91db4c6a', 'Rix이누아리두리네', 'RixInuaridurine', 'RixInuaridurine', 'decorative', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/962', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '6261fa1b-a973-4208-94f5-b501b289ca2d', '모노플렉스KR Italic', 'MonoplexkrItalic', 'MonoplexkrItalic', 'decorative', '모노플렉스KR Italic폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/968', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '3d603f62-3017-4639-b920-5a66ccdbbd8a', '모노플렉스KR', 'Monoplexkr', 'Monoplexkr', 'decorative', '모노플렉스KR폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/973', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '15ca53a4-9f5c-447e-a492-7ed720bb3a9b', '모노플렉스Nerd', 'MonoplexNerd', 'MonoplexNerd', 'decorative', '모노플렉스Nerd폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/981', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '16599216-52ef-4761-b5e0-f030c7e68a05', '모노플렉스Nerd Italic', 'MonoplexNerdItalic', 'MonoplexNerdItalic', 'decorative', '모노플렉스Nerd Italic폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/982', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c8719958-31d1-4f6f-895d-ee5bf5b2abc0', '모노플렉스Wide', 'MonoplexWide', 'MonoplexWide', 'decorative', '모노플렉스Wide폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/997', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'e1b204fd-2a1b-4530-a96f-e331b664226b', '모노플렉스Wide Italic', 'MonoplexWideItalic', 'MonoplexWideItalic', 'decorative', '모노플렉스Wide Italic폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/998', NULL, 0, true, false, NOW(), NOW() );

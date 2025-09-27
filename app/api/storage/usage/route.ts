@@ -47,17 +47,23 @@ export async function GET(request: NextRequest) {
 
     // 업그레이드 혜택 계산
     const upgradeBenefits = {
+      STARTER: plan !== 'STARTER' ? {
+        totalGB: Math.round(STORAGE_LIMITS.STARTER / 1024 / 1024 / 1024),
+        additionalGB: Math.max(0, Math.round((STORAGE_LIMITS.STARTER - maxBytes) / 1024 / 1024 / 1024)),
+        additionalImages: Math.max(0, Math.floor((STORAGE_LIMITS.STARTER - maxBytes) / avgImageSize)),
+        price: '월 29,000원'
+      } : null,
       PRO: plan !== 'PRO' ? {
         totalGB: Math.round(STORAGE_LIMITS.PRO / 1024 / 1024 / 1024),
         additionalGB: Math.max(0, Math.round((STORAGE_LIMITS.PRO - maxBytes) / 1024 / 1024 / 1024)),
         additionalImages: Math.max(0, Math.floor((STORAGE_LIMITS.PRO - maxBytes) / avgImageSize)),
-        price: '월 30,000원'
+        price: '월 59,000원'
       } : null,
       PREMIUM: plan !== 'PREMIUM' ? {
         totalGB: Math.round(STORAGE_LIMITS.PREMIUM / 1024 / 1024 / 1024),
         additionalGB: Math.max(0, Math.round((STORAGE_LIMITS.PREMIUM - maxBytes) / 1024 / 1024 / 1024)),
         additionalImages: Math.max(0, Math.floor((STORAGE_LIMITS.PREMIUM - maxBytes) / avgImageSize)),
-        price: '월 100,000원'
+        price: '월 99,000원'
       } : null
     };
 

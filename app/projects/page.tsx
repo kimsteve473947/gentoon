@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Plus, 
   Search, 
@@ -12,7 +13,9 @@ import {
   Users,
   ChevronRight,
   Trash2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Check,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -59,6 +62,11 @@ export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'webtoon' | 'characters' | 'elements'>('all');
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false); // 데이터 로딩 상태 (탭 전환시)
+
+  // 🚀 일괄 삭제를 위한 선택 상태 관리
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // 🚀 성능 최적화: 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
@@ -110,11 +118,14 @@ export default function ProjectsPage() {
       // ⚡ 프로젝트 데이터만 먼저 설정
       if (projectsResult.projects && Array.isArray(projectsResult.projects)) {
         setProjects(projectsResult.projects);
-        setHasMore(Boolean(projectsResult.pagination?.hasNextPage));
+        const hasNextPage = Boolean(projectsResult.pagination?.hasNextPage);
+        setHasMore(hasNextPage);
         setCurrentPage(1);
+        console.log(`🎯 Initial load: ${projectsResult.projects.length} projects, hasMore: ${hasNextPage}, pagination:`, projectsResult.pagination);
       } else {
         setProjects([]);
         setHasMore(false);
+        console.log(`❌ No projects found in initial load`);
       }
       
       // ⚡ 로딩 완료 - UI 즉시 표시
@@ -170,7 +181,10 @@ export default function ProjectsPage() {
   // 🚀 추가 프로젝트 로딩 (무한 스크롤)
   const loadMoreProjects = async () => {
     console.log(`🔄 loadMoreProjects called - loadingMore: ${loadingMore}, hasMore: ${hasMore}, currentPage: ${currentPage}`);
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore) {
+      console.log(`❌ Load more blocked - loadingMore: ${loadingMore}, hasMore: ${hasMore}`);
+      return;
+    }
     
     try {
       setLoadingMore(true);
@@ -180,19 +194,22 @@ export default function ProjectsPage() {
       
       console.log(`📊 API Result:`, result);
       
-      if (result && result.projects.length > 0) {
+      if (result && result.projects && result.projects.length > 0) {
         console.log(`✅ Adding ${result.projects.length} new projects, hasMore: ${result.hasMore}`);
         // 🛡️ 중복 프로젝트 방지 - 기존 ID와 겹치지 않는 프로젝트만 추가
         setProjects(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const newProjects = result.projects.filter(p => !existingIds.has(p.id));
           console.log(`🔍 Filtered ${newProjects.length} new projects (${result.projects.length - newProjects.length} duplicates filtered)`);
-          return [...prev, ...newProjects];
+          const updatedProjects = [...prev, ...newProjects];
+          console.log(`📊 Total projects after update: ${updatedProjects.length}`);
+          return updatedProjects;
         });
         setCurrentPage(nextPage);
         setHasMore(result.hasMore);
+        console.log(`📄 Updated currentPage to ${nextPage}, hasMore: ${result.hasMore}`);
       } else {
-        console.log(`❌ No more projects to load`);
+        console.log(`❌ No more projects to load - result:`, result);
         setHasMore(false);
       }
     } catch (error) {
@@ -275,6 +292,81 @@ export default function ProjectsPage() {
       console.log(`✅ 요소 영구 삭제 완료: ${elementId}`);
     } catch (error) {
       console.error('요소 삭제 중 오류:', error);
+    }
+  };
+
+  // 🚀 일괄 삭제 관련 함수들
+  const handleToggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    if (!isSelectMode) {
+      setSelectedProjects(new Set());
+    }
+  };
+
+  const handleSelectProject = (projectId: string, selected: boolean) => {
+    setSelectedProjects(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(projectId);
+      } else {
+        newSet.delete(projectId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allProjectIds = new Set(filteredProjects.map(p => p.id));
+      setSelectedProjects(allProjectIds);
+    } else {
+      setSelectedProjects(new Set());
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProjects.size === 0) return;
+    
+    const confirmed = confirm(`선택된 ${selectedProjects.size}개 프로젝트를 휴지통으로 이동하시겠습니까?`);
+    if (!confirmed) return;
+
+    try {
+      setIsBulkDeleting(true);
+      
+      // 선택된 프로젝트들을 병렬로 삭제 처리
+      const deletePromises = Array.from(selectedProjects).map(projectId => 
+        fetch(`/api/projects/${projectId}/trash`, { method: 'PATCH' })
+      );
+      
+      const results = await Promise.allSettled(deletePromises);
+      
+      // 성공적으로 삭제된 프로젝트들만 UI에서 제거
+      const successfulDeletions = Array.from(selectedProjects).filter((projectId, index) => 
+        results[index].status === 'fulfilled'
+      );
+      
+      if (successfulDeletions.length > 0) {
+        setProjects(prev => prev.filter(project => !successfulDeletions.includes(project.id)));
+        console.log(`✅ ${successfulDeletions.length}개 프로젝트 휴지통 이동 완료`);
+      }
+      
+      // 선택 모드 해제
+      setSelectedProjects(new Set());
+      setIsSelectMode(false);
+      
+      // 실패한 삭제가 있으면 알림
+      const failedCount = selectedProjects.size - successfulDeletions.length;
+      if (failedCount > 0) {
+        alert(`${successfulDeletions.length}개 프로젝트가 휴지통으로 이동되었습니다. ${failedCount}개는 실패했습니다.`);
+      } else {
+        alert(`${successfulDeletions.length}개 프로젝트가 휴지통으로 이동되었습니다.`);
+      }
+      
+    } catch (error) {
+      console.error('일괄 삭제 중 오류:', error);
+      alert('일괄 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -675,18 +767,83 @@ export default function ProjectsPage() {
                   <FolderOpen className="h-5 w-5 mr-2 text-purple-600" />
                   웹툰 스페이스
                 </h2>
-                <Button
-                  onClick={handleNewProject}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  새 웹툰 만들기
-                </Button>
+                <div className="flex items-center gap-3">
+                  {/* 선택 모드 토글 버튼 */}
+                  {filteredProjects.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleToggleSelectMode}
+                      className="bg-white hover:bg-gray-50"
+                    >
+                      {isSelectMode ? (
+                        <>
+                          <X className="h-4 w-4 mr-2" />
+                          선택 취소
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          선택
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleNewProject}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    새 웹툰 만들기
+                  </Button>
+                </div>
               </div>
 
+              {/* 선택 모드일 때 전체 선택 및 일괄 삭제 컨트롤 */}
+              {isSelectMode && filteredProjects.length > 0 && (
+                <div className="flex items-center justify-between mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="select-all-projects"
+                      checked={selectedProjects.size === filteredProjects.length && filteredProjects.length > 0}
+                      onCheckedChange={handleSelectAll}
+                      disabled={isBulkDeleting}
+                    />
+                    <label 
+                      htmlFor="select-all-projects" 
+                      className="text-sm font-medium text-gray-700 cursor-pointer"
+                    >
+                      전체 선택 ({selectedProjects.size}/{filteredProjects.length})
+                    </label>
+                  </div>
+                  
+                  {selectedProjects.size > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleBulkDelete}
+                      disabled={isBulkDeleting}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {isBulkDeleting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          삭제 중...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          선택된 {selectedProjects.size}개 삭제
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-4 gap-6">
-                {/* 프로젝트 카드들 - 4x3 그리드로 12개 */}
-                {filteredProjects.slice(0, 12).map((project) => (
+                {/* 프로젝트 카드들 - 4x3 그리드 */}
+                {filteredProjects.map((project) => (
                   <ProjectCardWithDelete 
                     key={project.id}
                     project={{
@@ -696,6 +853,9 @@ export default function ProjectsPage() {
                       lastEdited: project.lastEdited
                     }}
                     onDelete={handleDeleteProject}
+                    isSelectMode={isSelectMode}
+                    isSelected={selectedProjects.has(project.id)}
+                    onSelect={(selected) => handleSelectProject(project.id, selected)}
                   />
                 ))}
               </div>
@@ -717,7 +877,7 @@ export default function ProjectsPage() {
                     ) : (
                       <>
                         <ChevronRight className="h-4 w-4 mr-2" />
-                        더보기 (12개)
+                        더보기 ({ITEMS_PER_PAGE}개)
                       </>
                     )}
                   </Button>

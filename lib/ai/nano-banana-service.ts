@@ -320,8 +320,13 @@ export class NanoBananaService {
       
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
         console.log(`⚠️ Vertex AI SDK 생성 중단됨: ${candidate.finishReason}`);
-        if (candidate.finishReason === 'PROHIBITED_CONTENT') {
+        if (candidate.finishReason === 'PROHIBITED_CONTENT' || candidate.finishReason === 'SAFETY') {
           console.log('🚫 콘텐츠 정책 위반으로 이미지 생성이 거부되었습니다');
+          throw new Error('CONTENT_POLICY_VIOLATION');
+        }
+        if (candidate.finishReason === 'RECITATION') {
+          console.log('🚫 저작권 침해 우려로 이미지 생성이 거부되었습니다');
+          throw new Error('COPYRIGHT_VIOLATION');
         }
         throw new Error(`이미지 생성이 중단됨: ${candidate.finishReason}`);
       }
@@ -475,7 +480,18 @@ export class NanoBananaService {
         location: process.env.GOOGLE_CLOUD_LOCATION || 'global'
       });
       
-      throw new Error(`웹툰 패널 생성에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      // 사용자 친화적 에러 메시지로 변환
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      
+      if (errorMessage === 'CONTENT_POLICY_VIOLATION') {
+        throw new Error('CONTENT_POLICY_VIOLATION');
+      }
+      
+      if (errorMessage.includes('Vertex AI SDK 호출 실패')) {
+        throw new Error('잠시 후 다시 시도해 주세요. AI 서비스에 일시적인 문제가 발생했습니다.');
+      }
+      
+      throw new Error(`이미지 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.`);
     }
   }
   
@@ -825,10 +841,32 @@ CRITICAL CHARACTER CONSISTENCY REQUIREMENTS:
           hasData: !!chunk.data, 
           hasCandidates: !!chunk.candidates,
           hasUsageMetadata: !!chunk.usageMetadata,
+          hasPromptFeedback: !!chunk.promptFeedback,
           keys: Object.keys(chunk)
         });
         
         allChunks.push(chunk);
+        
+        // promptFeedback 확인 - 안전 필터링 감지
+        if (chunk.promptFeedback) {
+          console.log('🚨 PromptFeedback 감지:', JSON.stringify(chunk.promptFeedback, null, 2));
+          
+          // 안전 필터링으로 차단된 경우
+          if (chunk.promptFeedback.blockReason) {
+            console.log('🚫 안전 필터링으로 요청 차단됨:', chunk.promptFeedback.blockReason);
+            throw new Error('CONTENT_POLICY_VIOLATION');
+          }
+          
+          // 안전 등급이 문제가 있는 경우
+          if (chunk.promptFeedback.safetyRatings) {
+            for (const rating of chunk.promptFeedback.safetyRatings) {
+              if (rating.probability === 'HIGH' || rating.probability === 'MEDIUM') {
+                console.log('🚫 안전성 검사 실패:', rating.category, rating.probability);
+                throw new Error('CONTENT_POLICY_VIOLATION');
+              }
+            }
+          }
+        }
         
         // 텍스트 처리
         if (chunk.text) {

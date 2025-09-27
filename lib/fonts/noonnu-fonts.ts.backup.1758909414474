@@ -1,0 +1,425 @@
+/**
+ * 🎨 눈누(noonnu.cc) 사이트에서 수집한 저작권 문제없는 웹폰트들
+ * - 임베딩 권한: "사용 가능"만 선별
+ * - 상업적 이용 가능
+ * - 웹사이트 및 프로그램 서버 내 폰트 탑재 허용
+ */
+
+export interface FontWeight {
+  weight: number;
+  name: string;
+  cssCode: string;
+}
+
+export interface NoonnnuFont {
+  id: string;
+  nameKo: string;
+  nameEn: string;
+  fontFamily: string;
+  category: 'gothic' | 'serif' | 'handwriting' | 'decorative' | 'monospace';
+  cssCode: string;
+  provider: string;
+  originalUrl: string;
+  description?: string;
+  weights?: FontWeight[];
+}
+
+// 수집된 18개의 저작권 문제없는 웹폰트들
+export const NOONNU_FONTS: NoonnnuFont[] = [
+  // 고딕체 (7개)
+  {
+    id: 'kopub-dotum',
+    nameKo: 'KoPub 돋움체',
+    nameEn: 'KoPubDotum',
+    fontFamily: 'KoPubDotum',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'KoPubDotum';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/KoPubDotum.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '한국출판인회의',
+    originalUrl: 'https://noonnu.cc/font_page/33',
+    description: '깔끔하고 가독성 좋은 고딕체',
+    weights: [
+      {
+        weight: 300,
+        name: 'Light',
+        cssCode: `@font-face {
+          font-family: 'KoPubDotum';
+          src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/KoPubDotumLight.woff') format('woff');
+          font-weight: 300;
+          font-display: swap;
+        }`
+      },
+      {
+        weight: 400,
+        name: 'Regular',
+        cssCode: `@font-face {
+          font-family: 'KoPubDotum';
+          src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/KoPubDotum.woff') format('woff');
+          font-weight: 400;
+          font-display: swap;
+        }`
+      },
+      {
+        weight: 700,
+        name: 'Bold',
+        cssCode: `@font-face {
+          font-family: 'KoPubDotum';
+          src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/KoPubDotumBold.woff') format('woff');
+          font-weight: 700;
+          font-display: swap;
+        }`
+      }
+    ]
+  },
+  {
+    id: 'hanwha-hanul',
+    nameKo: '한수원 한울림체',
+    nameEn: 'HanwhaHanul',
+    fontFamily: 'HanwhaHanul',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'HanwhaHanul';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/HanwhaHanul.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '한국수력원자력',
+    originalUrl: 'https://noonnu.cc/font_page/542',
+    description: '현대적이고 깔끔한 디자인의 고딕체'
+  },
+  {
+    id: 'arita-dotum',
+    nameKo: '아리따돋움',
+    nameEn: 'AritaDotum',
+    fontFamily: 'Arita-dotum-SemiBold',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'Arita-dotum-SemiBold';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Arita-dotum-SemiBold.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '아모레퍼시픽',
+    originalUrl: 'https://noonnu.cc/font_page/145',
+    description: '세련되고 우아한 느낌의 고딕체'
+  },
+  {
+    id: 'spoqa-han-sans',
+    nameKo: '스포카 한 산스',
+    nameEn: 'SpoqaHanSans',
+    fontFamily: 'Spoqa Han Sans',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'Spoqa Han Sans';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/SpoqaHanSans-Regular.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '스포카',
+    originalUrl: 'https://noonnu.cc/font_page/204',
+    description: '디지털 환경에 최적화된 고딕체'
+  },
+  {
+    id: 'dohyeon',
+    nameKo: '도현체',
+    nameEn: 'DoHyeon',
+    fontFamily: 'Do Hyeon',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'Do Hyeon';
+      src: url('https://fonts.gstatic.com/s/dohyeon/v13/TwMN-I8CRRU2zM86HFE3ZwaH__-C.woff2') format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }`,
+    provider: 'Google Fonts',
+    originalUrl: 'https://noonnu.cc/font_page/90',
+    description: '통통하고 귀여운 느낌의 고딕체'
+  },
+  {
+    id: 'goyang-deokyang',
+    nameKo: '고양덕양체',
+    nameEn: 'GoyangDeokyang',
+    fontFamily: 'GoyangDeokyang',
+    category: 'gothic',
+    cssCode: `@font-face {
+      font-family: 'GoyangDeokyang';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/GoyangDeokyang.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '고양시청',
+    originalUrl: 'https://noonnu.cc/font_page/386',
+    description: '친근하고 따뜻한 느낌의 고딕체'
+  },
+  {
+    id: 'nanum-gothic-coding',
+    nameKo: '나눔고딕코딩',
+    nameEn: 'NanumGothicCoding',
+    fontFamily: 'NanumGothicCoding',
+    category: 'monospace',
+    cssCode: `@font-face {
+      font-family: 'NanumGothicCoding';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NanumGothicCoding.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '네이버',
+    originalUrl: 'https://noonnu.cc/font_page/51',
+    description: '프로그래밍을 위한 고정폭 글꼴'
+  },
+
+  // 바탕/명조체 (6개)
+  {
+    id: 'bon-myeongjo',
+    nameKo: '본명조',
+    nameEn: 'BonMyeongjo',
+    fontFamily: 'BonMyeongjo',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'BonMyeongjo';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/BonMyeongjo.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: 'SM엔터테인먼트',
+    originalUrl: 'https://noonnu.cc/font_page/131',
+    description: '우아하고 고급스러운 명조체'
+  },
+  {
+    id: 'hs-spring-breeze',
+    nameKo: 'HS봄바람체 2.0',
+    nameEn: 'HSSpringBreeze',
+    fontFamily: 'HS봄바람체2.0',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'HS봄바람체2.0';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/HS봄바람체2.0.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '한성컴퓨터',
+    originalUrl: 'https://noonnu.cc/font_page/293',
+    description: '따뜻하고 부드러운 바탕체'
+  },
+  {
+    id: 'jeju-myeongjo',
+    nameKo: '제주명조',
+    nameEn: 'JejuMyeongjo',
+    fontFamily: 'JejuMyeongjo',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'JejuMyeongjo';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/JejuMyeongjo.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '제주특별자치도',
+    originalUrl: 'https://noonnu.cc/font_page/105',
+    description: '제주의 아름다움이 담긴 명조체'
+  },
+  {
+    id: 'seoul-hangang',
+    nameKo: '서울한강체',
+    nameEn: 'SeoulHangang',
+    fontFamily: 'SeoulHangang',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'SeoulHangang';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/SeoulHangang.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '서울특별시',
+    originalUrl: 'https://noonnu.cc/font_page/351',
+    description: '서울의 품격이 담긴 바탕체'
+  },
+  {
+    id: 'yisunsin',
+    nameKo: '이순신체',
+    nameEn: 'YiSunSin',
+    fontFamily: 'yisunsinB',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'yisunsinB';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/yisunsinB.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '아산시청',
+    originalUrl: 'https://noonnu.cc/font_page/364',
+    description: '강인하고 의연한 느낌의 명조체'
+  },
+  {
+    id: 'goun-batang',
+    nameKo: '고운바탕',
+    nameEn: 'GounBatang',
+    fontFamily: 'GounBatang',
+    category: 'serif',
+    cssCode: `@font-face {
+      font-family: 'GounBatang';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/GounBatang.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '토끼네활자공장',
+    originalUrl: 'https://noonnu.cc/font_page/132',
+    description: '곱고 아름다운 바탕체'
+  },
+
+  // 손글씨체 (3개)
+  {
+    id: 'binggrae',
+    nameKo: '빙그레체',
+    nameEn: 'Binggrae',
+    fontFamily: 'Binggrae',
+    category: 'handwriting',
+    cssCode: `@font-face {
+      font-family: 'Binggrae';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Binggrae.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '빙그레',
+    originalUrl: 'https://noonnu.cc/font_page/125',
+    description: '친근하고 귀여운 손글씨체'
+  },
+  {
+    id: 'eobi-hanbi',
+    nameKo: '어비 한비',
+    nameEn: 'EobiHanbi',
+    fontFamily: 'eobiHanbi',
+    category: 'handwriting',
+    cssCode: `@font-face {
+      font-family: 'eobiHanbi';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/eobiHanbi.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '개인 제작자',
+    originalUrl: 'https://noonnu.cc/font_page/183',
+    description: '자연스럽고 개성 있는 손글씨체'
+  },
+  {
+    id: 'eobi-bad-woman',
+    nameKo: '어비 못된여자체',
+    nameEn: 'EobiBadWoman',
+    fontFamily: 'eobiBadWoman',
+    category: 'handwriting',
+    cssCode: `@font-face {
+      font-family: 'eobiBadWoman';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/eobiBadWoman.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '개인 제작자',
+    originalUrl: 'https://noonnu.cc/font_page/184',
+    description: '개성 넘치는 독특한 손글씨체'
+  },
+
+  // 장식체 (2개)
+  {
+    id: 'gabia-spring-breeze',
+    nameKo: '가비아 봄바람체',
+    nameEn: 'GabiaSpringBreeze',
+    fontFamily: 'GabiaSolmee',
+    category: 'decorative',
+    cssCode: `@font-face {
+      font-family: 'GabiaSolmee';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/GabiaSolmee.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '가비아',
+    originalUrl: 'https://noonnu.cc/font_page/129',
+    description: '봄날의 따뜻함이 담긴 장식체'
+  },
+  {
+    id: 'donggurami',
+    nameKo: '동그라미체',
+    nameEn: 'Donggurami',
+    fontFamily: 'Donggurami',
+    category: 'decorative',
+    cssCode: `@font-face {
+      font-family: 'Donggurami';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Donggurami.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }`,
+    provider: '우아한형제들',
+    originalUrl: 'https://noonnu.cc/font_page/143',
+    description: '둥글둥글하고 귀여운 장식체'
+  }
+];
+
+// 카테고리별 폰트 분류
+export const FONTS_BY_CATEGORY = {
+  gothic: NOONNU_FONTS.filter(font => font.category === 'gothic'),
+  serif: NOONNU_FONTS.filter(font => font.category === 'serif'),
+  handwriting: NOONNU_FONTS.filter(font => font.category === 'handwriting'),
+  decorative: NOONNU_FONTS.filter(font => font.category === 'decorative'),
+  monospace: NOONNU_FONTS.filter(font => font.category === 'monospace')
+};
+
+// 카테고리 한글명 매핑
+export const CATEGORY_LABELS = {
+  gothic: '고딕체',
+  serif: '명조체',
+  handwriting: '손글씨체',
+  decorative: '장식체',
+  monospace: '코딩체'
+} as const;
+
+// 스튜디오에서 사용할 통합 폰트 목록 (기존 Google Fonts + Noonnu Fonts)
+export const STUDIO_FONTS = [
+  // Google Fonts (기존 유지)
+  { 
+    id: 'noto-sans-kr',
+    nameKo: 'Noto Sans KR',
+    nameEn: 'Noto Sans KR',
+    fontFamily: '"Noto Sans KR", sans-serif',
+    category: 'gothic' as const,
+    provider: 'Google Fonts',
+    cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;300;400;500;700;900&display=swap");',
+    weights: [
+      { weight: 100, name: 'Thin', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100&display=swap");' },
+      { weight: 300, name: 'Light', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300&display=swap");' },
+      { weight: 400, name: 'Regular', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400&display=swap");' },
+      { weight: 500, name: 'Medium', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500&display=swap");' },
+      { weight: 700, name: 'Bold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700&display=swap");' },
+      { weight: 900, name: 'Black', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=swap");' }
+    ]
+  },
+  { 
+    id: 'noto-serif-kr',
+    nameKo: 'Noto Serif KR',
+    nameEn: 'Noto Serif KR',
+    fontFamily: '"Noto Serif KR", serif',
+    category: 'serif' as const,
+    provider: 'Google Fonts',
+    cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;600;700;900&display=swap");',
+    weights: [
+      { weight: 200, name: 'ExtraLight', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200&display=swap");' },
+      { weight: 300, name: 'Light', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300&display=swap");' },
+      { weight: 400, name: 'Regular', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400&display=swap");' },
+      { weight: 500, name: 'Medium', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500&display=swap");' },
+      { weight: 600, name: 'SemiBold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600&display=swap");' },
+      { weight: 700, name: 'Bold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&display=swap");' },
+      { weight: 900, name: 'Black', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&display=swap");' }
+    ]
+  },
+  // Noonnu Fonts 추가
+  ...NOONNU_FONTS.map(font => ({
+    id: font.id,
+    nameKo: font.nameKo,
+    nameEn: font.nameEn,
+    fontFamily: `"${font.fontFamily}", ${font.category === 'serif' ? 'serif' : font.category === 'monospace' ? 'monospace' : 'sans-serif'}`,
+    category: font.category,
+    provider: font.provider,
+    cssCode: font.cssCode,
+    weights: font.weights
+  }))
+];

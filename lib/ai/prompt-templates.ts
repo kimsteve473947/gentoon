@@ -9,6 +9,7 @@ interface PromptTemplateOptions {
   aspectRatio: AspectRatio;
   userPrompt: string;
   characterInstructions?: string;
+  elementInstructions?: string;
   width: number;
   height: number;
 }
@@ -58,7 +59,7 @@ const ASPECT_RATIO_TEMPLATES = {
  * 비율에 최적화된 간단하고 효과적인 프롬프트 생성
  */
 export function generateOptimizedPrompt(options: PromptTemplateOptions): string {
-  const { aspectRatio, userPrompt, characterInstructions, width, height } = options;
+  const { aspectRatio, userPrompt, characterInstructions, elementInstructions, width, height } = options;
   const template = ASPECT_RATIO_TEMPLATES[aspectRatio];
   
   const optimizedPrompt = `${userPrompt}
@@ -66,6 +67,11 @@ export function generateOptimizedPrompt(options: PromptTemplateOptions): string 
 ${characterInstructions ? `
 캐릭터 일관성: ${characterInstructions}
 레퍼런스 이미지와 정확히 동일한 외모로 그려주세요.
+` : ''}
+
+${elementInstructions ? `
+요소/배경 포함: ${elementInstructions}
+이 요소들을 장면에 자연스럽게 배치하고 통합하세요.
 ` : ''}
 
 스타일: 한국 웹툰 스타일, 깨끗한 디지털 아트, 선명한 색상

@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
     const { subject, message, category = 'general', userEmail } = body;
 
     // 필수 필드 검증
-    if (!subject || !message) {
+    if (!subject || !message || !userEmail) {
       return NextResponse.json(
-        { success: false, error: "제목과 내용은 필수입니다" },
+        { success: false, error: "제목, 내용, 연락처 이메일은 필수입니다" },
         { status: 400 }
       );
     }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       message: message.trim(),
       category,
       priority,
-      userEmail: userEmail || userData.email,
+      userEmail: userEmail, // userEmail이 필수로 전달되어야 함 (연락처 이메일)
       userAgent,
       ipAddress,
     };

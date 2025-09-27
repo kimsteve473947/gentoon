@@ -1,0 +1,41 @@
+-- font_families 배치 31
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c595ac49-3c82-4c7d-86f4-b4c71a82f94d', '전라북도체', 'JeollabukDo', 'JeollabukDo', 'decorative', '전라북도체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/57', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f6549eff-5cde-4eef-85c1-4551f7e9a685', '중학생', 'MiddleSchoolStudent', 'MiddleSchoolStudent', 'decorative', '중학생폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/570', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'b1b8590c-ffe2-4419-927d-2cc74cd7d6c6', '예쁜 민경체', 'PrettyMinkyung', 'PrettyMinkyung', 'decorative', '예쁜 민경체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/571', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'ce619a10-394f-4733-902a-20e23de092f1', '미니 손글씨', 'MiniHandwriting', 'MiniHandwriting', 'handwriting', '이 폰트로 만든 디자인', '사용 가능', 'https://noonnu.cc/font_page/572', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'af72448b-bbc3-4f3d-9f97-2da73b57f050', '딸에게 엄마가', 'MomToHerDaughter', 'MomToHerDaughter', 'decorative', '딸에게 엄마가폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/573', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'e2790e1a-030e-489b-bbb5-3abe7a6c5c42', '몽돌', 'Mongdol', 'Mongdol', 'decorative', '몽돌폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/574', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '444976c4-c288-4823-92a2-bb420b24aaa2', '무궁화', 'Mugunghwa', 'Mugunghwa', 'decorative', '무궁화폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/575', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'fa7794f9-222b-41a2-ac8a-de252d22b253', '무진장체', 'Muzinjang', 'Muzinjang', 'decorative', '무진장체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/576', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'da9a3261-de07-41a0-b506-23e6cfa0b0c3', '나의 아내 손글씨', 'MyWifeSHandwriting', 'MyWifeSHandwriting', 'handwriting', '나의 아내 손글씨폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/577', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f2d8cf9b-c591-4f41-93dd-267299b7cf7f', '신혼부부', 'NewlywedCouple', 'NewlywedCouple', 'decorative', '신혼부부폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/578', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '6d263b62-8564-475c-b77d-d1643b218cbb', '옥비체', 'Okbi', 'Okbi', 'decorative', '옥비체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/579', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '9ca4c21e-2d75-4998-8b48-7c9479a26ffb', '달의궤도', 'LunarOrbit', 'LunarOrbit', 'decorative', '달의궤도폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/580', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '3a5df28a-0ba1-4606-80c8-2c59d37c43b8', '진주 박경아체', 'JinjuParkKyeongA', 'JinjuParkKyeongA', 'decorative', '진주 박경아체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/581', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '218e62e3-9130-4350-bee7-79601731d3e3', '북극성', 'Polaris', 'Polaris', 'decorative', '북극성폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/582', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'ffc44dfe-f813-4e5b-9306-bb8d9caf33fb', '왼손잡이도 예뻐', 'LeftHandedPeopleAreBeautifulToo', 'LeftHandedPeopleAreBeautifulToo', 'decorative', '왼손잡이도 예뻐폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/583', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '36d8f4b5-4547-4469-bb18-d18fe5e49c08', '자부심지우', 'Jabosimjiu', 'Jabosimjiu', 'decorative', '자부심지우폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/584', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '73c132f2-ec23-4d30-a8ed-968df082a4fd', '다시 시작해', 'StartOver', 'StartOver', 'decorative', '다시 시작해폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/585', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c90b52b9-1fb1-44ce-8cc8-3b53c2ebee73', '장미체', 'Jangmi', 'Jangmi', 'decorative', '장미체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/586', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '0718c4eb-02bf-4897-ac32-7cc9c9005b26', '둥근인연', 'RoundRelationship', 'RoundRelationship', 'decorative', '둥근인연폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/587', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '70bde63d-f64b-47f0-891d-0d91cb377baa', '상해찬미체', 'ShanghaiChanmi', 'ShanghaiChanmi', 'decorative', '상해찬미체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/588', NULL, 0, true, false, NOW(), NOW() );

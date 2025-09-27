@@ -76,7 +76,7 @@ export default function CouponFormModal({
     try {
       setLoading(true);
       
-      const url = isEdit ? `/api/admin/coupons/${coupon.id}` : '/api/admin/coupons';
+      const url = isEdit ? `/api/admin-473947/coupons/${coupon.id}` : '/api/admin-473947/coupons';
       const method = isEdit ? 'PATCH' : 'POST';
       
       const response = await fetch(url, {

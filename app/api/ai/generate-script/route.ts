@@ -28,7 +28,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       return ApiResponse.badRequest("잘못된 요청 형식입니다");
     }
 
-    const { storyPrompt, characterNames, panelCount, style } = requestBody;
+    const { storyPrompt, characterNames, elementNames, panelCount, style } = requestBody;
     
     if (!storyPrompt || typeof storyPrompt !== 'string' || storyPrompt.trim().length === 0) {
       return ApiResponse.badRequest("스토리 프롬프트가 필요합니다");
@@ -42,23 +42,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       return ApiResponse.badRequest("패널 개수는 1-20개 사이여야 합니다");
     }
 
-    // 텍스트 생성 토큰 잔액 확인
-    let textBalance;
+    // 🎯 단순한 AI 대본 생성 횟수 확인
+    let scriptBalance;
     try {
-      textBalance = await tokenManager.getTextGenerationBalance(userId);
+      scriptBalance = await tokenManager.getScriptGenerationBalance(userId);
     } catch (balanceError) {
-      console.error("텍스트 토큰 잔액 조회 실패:", balanceError);
+      console.error("대본 생성 횟수 조회 실패:", balanceError);
       return ApiResponse.errorWithCode(
         ErrorCode.SERVER_ERROR,
-        "토큰 잔액 확인 중 오류가 발생했습니다",
+        "대본 생성 횟수 확인 중 오류가 발생했습니다",
         String(balanceError)
       );
     }
     
-    if (textBalance.remainingTokens < 1000) { // 최소 1000 토큰 필요
+    if (scriptBalance.remainingGenerations < 1) {
       return ApiResponse.errorWithCode(
         ErrorCode.INSUFFICIENT_TOKENS,
-        `텍스트 생성 토큰이 부족합니다 (${textBalance.userPlan} 플랜: ${textBalance.remainingTokens.toLocaleString()}/${textBalance.monthlyLimit.toLocaleString()}토큰 잔여)`
+        `AI 대본 생성 횟수가 부족합니다 (${scriptBalance.userPlan} 플랜: ${scriptBalance.remainingGenerations}/${scriptBalance.monthlyLimit}회 잔여)`
       );
     }
 
@@ -67,12 +67,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       ? `등장 캐릭터: ${characterNames.join(', ')}`
       : '';
 
+    // 요소 정보 문자열 생성  
+    const elementInfo = elementNames && elementNames.length > 0
+      ? `등장 요소: ${elementNames.join(', ')}`
+      : '';
+
     // 🎨 구글 최적화 기반 한국어 웹툰 프롬프트 생성
     const scriptPrompt = `
 웹툰 스토리를 ${panelCount}개 컷의 이미지 생성 프롬프트로 변환하세요.
 
 스토리: ${storyPrompt}
 ${characterInfo}
+${elementInfo}
 
 **규칙:**
 - 각 프롬프트 **100-200자** 제한
@@ -86,7 +92,8 @@ ${characterInfo}
     {
       "order": 1,
       "prompt": "클로즈업으로 잡힌 카페 안 여성이 따뜻한 오후 햇살 속에서 양손으로 커피컵을 감싸며 부드럽게 미소짓는 모습, 갈색 머리, 흰색 니트, 뒤쪽은 흐릿한 다른 손님들",
-      "characters": ["캐릭터이름들"]
+      "characters": ["캐릭터이름들"],
+      "elements": ["요소이름들"]
     }
   ]
 }
@@ -172,6 +179,7 @@ ${characterInfo}
           ...panel,
           prompt,
           characters: panel.characters || characterNames || [],
+          elements: panel.elements || elementNames || [],
           shot_type: panel.shot_type || 'medium shot',
           mood: panel.mood || 'neutral'
         };
@@ -198,6 +206,7 @@ ${characterInfo}
           order: i + 1,
           prompt: optimizedPrompt.length > 200 ? optimizedPrompt.substring(0, 197) + '...' : optimizedPrompt,
           characters: characterNames || [],
+          elements: elementNames || [],
           shot_type: shotType.replace(' shot', ''),
           mood: mood
         };
@@ -206,43 +215,36 @@ ${characterInfo}
       scriptData = { panels: fallbackPanels };
     }
 
-    // 실제 Vertex AI 텍스트 생성 토큰 사용량을 기반으로 추적
-    console.log(`🔢 대본 생성 - 실제 Vertex AI 텍스트 토큰 사용량: ${response.tokensUsed}`);
+    // 🎯 단순한 AI 대본 생성 횟수 1회 차감
+    console.log(`📝 대본 생성 완료 - AI 토큰 사용량: ${response.tokensUsed.toLocaleString()}`);
     
-    let tokenResult;
+    let generationResult;
     try {
-      tokenResult = await tokenManager.useTextGenerationTokens(
-        userId, 
-        response.tokensUsed, // 실제 Vertex AI에서 사용된 토큰 수
-        { 
-          requestType: 'script_generation',
-          description: `대본 생성: ${panelCount}컷 (실제 토큰: ${response.tokensUsed.toLocaleString()})`
-        }
-      );
-    } catch (tokenError) {
-      console.error("토큰 차감 처리 실패:", tokenError);
+      generationResult = await tokenManager.useScriptGeneration(userId);
+    } catch (generationError) {
+      console.error("대본 생성 횟수 차감 실패:", generationError);
       return ApiResponse.errorWithCode(
         ErrorCode.SERVER_ERROR,
-        "토큰 사용량 기록 중 오류가 발생했습니다",
-        String(tokenError)
+        "대본 생성 횟수 차감 중 오류가 발생했습니다",
+        String(generationError)
       );
     }
     
-    if (!tokenResult.success) {
+    if (!generationResult.success) {
       return ApiResponse.errorWithCode(
         ErrorCode.INSUFFICIENT_TOKENS,
-        tokenResult.error || "텍스트 생성 토큰 차감에 실패했습니다"
+        generationResult.error || "대본 생성 횟수 차감에 실패했습니다"
       );
     }
 
-    console.log(`✅ 텍스트 생성 토큰 기록 완료: ${response.tokensUsed.toLocaleString()}토큰`);
+    console.log(`✅ AI 대본 생성 완료: 1회 차감 (잔여: ${generationResult.remainingGenerations}/${generationResult.monthlyLimit}회)`);
 
     return ApiResponse.success({
       panels: scriptData.panels || [],
-      tokensUsed: response.tokensUsed, // 실제 사용된 토큰
-      remainingTextTokens: tokenResult.remainingTextTokens,
-      userPlan: tokenResult.userPlan,
-      monthlyLimit: tokenResult.monthlyLimit
+      tokensUsed: response.tokensUsed, // 참고용 (실제 차감은 횟수 기반)
+      remainingGenerations: generationResult.remainingGenerations,
+      userPlan: generationResult.userPlan,
+      monthlyLimit: generationResult.monthlyLimit
     });
 
   } catch (error) {

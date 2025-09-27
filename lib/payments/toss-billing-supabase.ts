@@ -5,7 +5,8 @@ import { tokenManager } from "@/lib/subscription/token-manager";
 // 토스페이먼츠 빌링 v2 API 클라이언트
 const TOSS_API_BASE_URL = "https://api.tosspayments.com/v1";
 const BILLING_AUTH_API = `${TOSS_API_BASE_URL}/billing/authorizations`;
-const BILLING_API = `${TOSS_API_BASE_URL}/billing`;
+const BILLING_API = `${TOSS_API_BASE_URL}/billing`; // 기존 (404 오류)
+const BILLING_PAYMENT_API = `${TOSS_API_BASE_URL}/payments/confirm`; // 일반 결제 확인 API
 
 // API 인증 헤더 생성
 function createAuthHeader(): string {
@@ -16,36 +17,11 @@ function createAuthHeader(): string {
   return `Basic ${Buffer.from(secretKey + ":").toString("base64")}`;
 }
 
-// 구독 플랜 정보 (실제 Gemini API 비용 기반)
-export const SUBSCRIPTION_PLANS = {
-  FREE: {
-    id: "FREE",
-    name: "Free",
-    price: 0,
-    tokens: 10000,      // 1만 토큰
-    characters: 1,
-    projects: 3,
-    description: "취미로 시작하는 분들께",
-  },
-  PRO: {
-    id: "PRO",
-    name: "Basic",
-    price: 30000,
-    tokens: 400000,     // 40만 토큰
-    characters: 3,
-    projects: Infinity,
-    description: "정기적으로 창작하는 분들께",
-  },
-  PREMIUM: {
-    id: "PREMIUM",
-    name: "Pro",
-    price: 100000,
-    tokens: 1500000,    // 150만 토큰
-    characters: 5,
-    projects: Infinity,
-    description: "전문 창작자를 위한",
-  },
-};
+// plan-config.ts에서 중앙 관리되는 플랜 정보 사용 (새로운 4티어 구조)
+import { PLAN_CONFIGS, SUBSCRIPTION_PLANS } from "@/lib/subscription/plan-config";
+
+// SUBSCRIPTION_PLANS는 plan-config.ts에서 import하고 re-export
+export { SUBSCRIPTION_PLANS };
 
 // 토스페이먼츠 에러 클래스
 export class TossPaymentsError extends Error {
@@ -54,11 +30,13 @@ export class TossPaymentsError extends Error {
     this.name = "TossPaymentsError";
   }
 
-  // 사용자 친화적 메시지 반환
+  // 사용자 친화적 메시지 반환 (2024 공식 가이드 기준)
   getUserFriendlyMessage(): string {
     switch (this.code) {
       case "PAY_PROCESS_CANCELED":
         return "결제가 취소되었습니다.";
+      case "PAY_PROCESS_ABORTED": 
+        return "결제가 중단되었습니다. 다시 시도해주세요.";
       case "REJECT_CARD_COMPANY":
         return "카드사에서 결제를 거부했습니다. 다른 카드를 사용해주세요.";
       case "INVALID_CARD_EXPIRATION":
@@ -70,24 +48,31 @@ export class TossPaymentsError extends Error {
       case "BILLING_KEY_NOT_FOUND":
         return "등록된 카드 정보를 찾을 수 없습니다. 카드를 다시 등록해주세요.";
       case "UNAUTHORIZED_KEY":
-        return "인증되지 않은 키입니다.";
+        return "자동결제 계약이 되어있지 않은 API 키입니다. 토스페이먼츠 고객센터(1544-7772)에 문의해주세요.";
       case "FORBIDDEN_REQUEST":
         return "허용되지 않은 요청입니다.";
       case "INVALID_REQUEST":
         return "잘못된 요청입니다.";
+      case "NOT_FOUND":
+        return "요청한 리소스를 찾을 수 없습니다.";
+      case "CONTRACT_NOT_FOUND":
+        return "자동결제 계약이 되어있지 않습니다. 토스페이먼츠 고객센터(1544-7772)로 문의해주세요.";
+      case "BILLING_NOT_SUPPORTED":
+        return "자동결제가 지원되지 않는 계약입니다. 토스페이먼츠 고객센터(1544-7772)로 문의해주세요.";
       default:
-        return "결제 처리 중 오류가 발생했습니다. 고객센터에 문의해주세요.";
+        return `결제 처리 중 오류가 발생했습니다. (오류코드: ${this.code}) 고객센터에 문의해주세요.`;
     }
   }
 }
 
-// 빌링키 발급 요청 생성 (토스페이먼츠 v2 API 준수)
+// 빌링키 발급 요청 생성 (공식 BillingAuthRequest 인터페이스 준수)
 export async function createBillingAuthRequest(
   userId: string,
   planId: keyof typeof SUBSCRIPTION_PLANS,
   customerEmail: string,
   customerName?: string,
-  discountedAmount?: number
+  discountedAmount?: number,
+  paymentMethod?: string
 ) {
   const plan = SUBSCRIPTION_PLANS[planId];
   const customerKey = `customer_${userId}`; // 고객 고유 키 (영숫자, 하이픈, 언더스코어만 허용)
@@ -97,17 +82,23 @@ export async function createBillingAuthRequest(
     customerKey,
     customerEmail,
     customerName: customerName || "고객",
-    successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-success?planId=${planId}&customerKey=${customerKey}&amount=${amount}`,
+    successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-success?planId=${planId}&amount=${amount}&paymentMethod=${paymentMethod || 'CARD'}`,
     failUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/billing-fail`,
   };
 }
 
-// 빌링키 발급 (authKey로 빌링키 조회)
+// 빌링키 발급 (authKey로 빌링키 조회) - 재시도 로직 추가
 export async function issueBillingKey(
   authKey: string,
-  customerKey: string
+  customerKey: string,
+  retryCount = 0
 ): Promise<{ billingKey: string; card: any }> {
+  const maxRetries = 3;
+  const retryDelay = (attempt: number) => Math.pow(2, attempt) * 1000; // 지수 백오프
+  
   try {
+    console.log(`빌링키 발급 시도 ${retryCount + 1}/${maxRetries + 1}:`, { authKey, customerKey });
+    
     const response = await fetch(`${BILLING_AUTH_API}/${authKey}`, {
       method: "POST",
       headers: {
@@ -119,56 +110,139 @@ export async function issueBillingKey(
       }),
     });
 
+    console.log(`빌링키 발급 응답:`, { status: response.status, statusText: response.statusText });
+
     if (!response.ok) {
       const error = await response.json();
+      console.error(`빌링키 발급 오류:`, error);
+      
+      // 재시도 가능한 오류인지 확인
+      const retryableErrors = ['INTERNAL_SERVER_ERROR', 'TEMPORARY_UNAVAILABLE', 'TIMEOUT'];
+      const shouldRetry = retryableErrors.includes(error.code) && retryCount < maxRetries;
+      
+      if (shouldRetry) {
+        console.log(`재시도 가능한 오류, ${retryDelay(retryCount)}ms 후 재시도...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay(retryCount)));
+        return issueBillingKey(authKey, customerKey, retryCount + 1);
+      }
+      
       throw new TossPaymentsError(error.code, error.message);
     }
 
     const data = await response.json();
+    console.log(`빌링키 발급 성공:`, { billingKey: data.billingKey, cardLast4: data.card?.number?.slice(-4) });
+    
     return {
       billingKey: data.billingKey,
       card: data.card,
     };
   } catch (error) {
-    console.error("Issue billing key error:", error);
+    console.error("빌링키 발급 최종 실패:", error);
+    
+    // 네트워크 오류 등으로 재시도 가능한 경우
+    if (retryCount < maxRetries && (error instanceof TypeError || error.message.includes('fetch'))) {
+      console.log(`네트워크 오류로 인한 재시도: ${retryDelay(retryCount)}ms 후`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay(retryCount)));
+      return issueBillingKey(authKey, customerKey, retryCount + 1);
+    }
+    
     throw error;
   }
 }
 
-// 자동결제 승인 (빌링키로 정기결제 실행)
+// 자동결제 승인 (빌링키로 정기결제 실행) - 다양한 API 엔드포인트 시도
 export async function executeAutoBilling(
   billingKey: string,
   customerKey: string,
   amount: number,
   orderName: string,
-  orderId?: string
+  orderId?: string,
+  retryCount = 0
 ): Promise<any> {
-  try {
-    const response = await fetch(BILLING_API, {
-      method: "POST",
-      headers: {
-        Authorization: createAuthHeader(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+  const maxRetries = 3;
+  const retryDelay = (attempt: number) => Math.pow(2, attempt) * 1000;
+  
+  // 다양한 API 엔드포인트 시도 목록
+  const apiEndpoints = [
+    { url: `${TOSS_API_BASE_URL}/billing/${billingKey}`, name: "빌링키별 결제 API" },
+    { url: `${TOSS_API_BASE_URL}/billing`, name: "일반 빌링 API" },
+    { url: `${TOSS_API_BASE_URL}/payments/billing`, name: "결제 빌링 API" }
+  ];
+  
+  for (const [index, endpoint] of apiEndpoints.entries()) {
+    try {
+      const requestData = {
         billingKey,
         customerKey,
         amount,
         orderId: orderId || `auto_${Date.now()}_${customerKey}`,
         orderName,
-      }),
-    });
+      };
+      
+      console.log(`자동결제 실행 시도 ${retryCount + 1}/${maxRetries + 1} (${endpoint.name}):`, {
+        url: endpoint.url,
+        billingKey: billingKey.slice(0, 10) + '...',
+        customerKey,
+        amount,
+        orderName,
+        orderId: requestData.orderId
+      });
+      
+      const response = await fetch(endpoint.url, {
+        method: "POST",
+        headers: {
+          Authorization: createAuthHeader(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new TossPaymentsError(error.code, error.message);
+      console.log(`자동결제 실행 응답 (${endpoint.name}):`, { 
+        status: response.status, 
+        statusText: response.statusText 
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`자동결제 실행 성공 (${endpoint.name}):`, { 
+          paymentKey: result.paymentKey, 
+          orderId: result.orderId,
+          amount: result.totalAmount 
+        });
+        return result;
+      } else if (response.status === 404) {
+        console.log(`${endpoint.name} 404 오류 - 다음 엔드포인트 시도...`);
+        continue; // 다음 엔드포인트 시도
+      } else {
+        const error = await response.json();
+        console.error(`자동결제 실행 오류 (${endpoint.name}):`, error);
+        
+        // 재시도 가능한 오류가 아니면 다음 엔드포인트 시도
+        const retryableErrors = [
+          'INTERNAL_SERVER_ERROR', 
+          'TEMPORARY_UNAVAILABLE', 
+          'TIMEOUT',
+          'BILLING_TEMPORARY_ERROR'
+        ];
+        
+        if (!retryableErrors.includes(error.code)) {
+          continue; // 다음 엔드포인트 시도
+        }
+        
+        throw new TossPaymentsError(error.code, error.message);
+      }
+    } catch (error) {
+      console.error(`${endpoint.name} 호출 실패:`, error);
+      if (index === apiEndpoints.length - 1) {
+        // 마지막 엔드포인트까지 실패한 경우
+        throw error;
+      }
+      continue; // 다음 엔드포인트 시도
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Auto billing error:", error);
-    throw error;
   }
+  
+  // 모든 엔드포인트 실패
+  throw new Error("모든 자동결제 API 엔드포인트에서 404 오류 발생. 자동결제 계약이 활성화되었는지 확인해주세요.");
 }
 
 // 구독 생성 또는 업그레이드 (빌링키 등록 후 첫 결제) - Supabase 버전
@@ -178,11 +252,13 @@ export async function createOrUpdateSubscription(
   billingKey: string,
   customerKey: string,
   cardInfo: any,
-  discountedAmount?: number
+  discountedAmount?: number,
+  supabaseClient?: any, // 외부 Supabase 클라이언트 (Service Role 등)
+  paymentMethod?: string
 ) {
   try {
     const plan = SUBSCRIPTION_PLANS[planId];
-    const supabase = await createClient();
+    const supabase = supabaseClient || await createClient();
     
     // 기존 구독 조회
     const { data: existingSubscription } = await supabase
@@ -200,6 +276,7 @@ export async function createOrUpdateSubscription(
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       tossBillingKey: billingKey,
       tossCustomerKey: customerKey,
+      paymentMethod: paymentMethod || 'CARD', // 복원: DB에 컬럼이 추가됨
       cancelAtPeriodEnd: false,
     };
     
@@ -239,19 +316,58 @@ export async function createOrUpdateSubscription(
       `sub_start_${Date.now()}_${userId}`
     );
     
-    // 결제 기록 생성
-    await supabase
+    // 결제 기록 생성 (중복 체크)
+    console.log('💳 Creating transaction record:', {
+      userId,
+      type: "SUBSCRIPTION",
+      amount: finalAmount,
+      tokens: plan.tokens,
+      status: "COMPLETED",
+      tossPaymentKey: payment.paymentKey,
+      tossOrderId: payment.orderId,
+    });
+    
+    // 이미 존재하는 거래인지 확인
+    const { data: existingTransaction } = await supabase
       .from('transaction')
-      .insert({
-        userId,
-        type: "SUBSCRIPTION",
-        amount: finalAmount,
-        tokens: plan.tokens,
-        status: "COMPLETED",
-        description: `${plan.name} 플랜 구독 시작${discountedAmount ? ' (추천인 할인 적용)' : ''}`,
-        tossPaymentKey: payment.paymentKey,
-        tossOrderId: payment.orderId,
-      });
+      .select('id')
+      .eq('tossPaymentKey', payment.paymentKey)
+      .single();
+    
+    let transactionData;
+    if (existingTransaction) {
+      console.log('ℹ️ Transaction already exists with this paymentKey:', payment.paymentKey);
+      transactionData = existingTransaction;
+    } else {
+      const { data: newTransaction, error: transactionError } = await supabase
+        .from('transaction')
+        .insert({
+          userId,
+          type: "SUBSCRIPTION",
+          amount: finalAmount,
+          tokens: plan.tokens,
+          status: "COMPLETED",
+          description: `${plan.name} 플랜 구독 시작${discountedAmount ? ' (추천인 할인 적용)' : ''}`,
+          tossPaymentKey: payment.paymentKey,
+          tossOrderId: payment.orderId,
+        })
+        .select()
+        .single();
+      
+      if (transactionError) {
+        console.error('❌ Transaction creation error:', transactionError);
+        console.error('Transaction error details:', {
+          code: transactionError.code,
+          message: transactionError.message,
+          details: transactionError.details,
+          hint: transactionError.hint
+        });
+        throw transactionError;
+      }
+      
+      transactionData = newTransaction;
+      console.log('✅ Transaction created successfully:', transactionData);
+    }
     
     // 카드 정보 로깅 (보안상 마스킹)
     console.log(`Subscription created for user ${userId} with card ending in ${cardInfo.number?.slice(-4)}`);

@@ -1,0 +1,95 @@
+/**
+ * 🎨 눈누(noonnu.cc) 사이트에서 수집한 저작권 문제없는 웹폰트들
+ * - 임베딩 권한: "사용 가능"만 선별
+ * - 상업적 이용 가능
+ * - 웹사이트 및 프로그램 서버 내 폰트 탑재 허용
+ * 
+ * 자동 생성됨: 2025. 9. 27. 오전 2:56:54
+ */
+
+export interface FontWeight {
+  weight: number;
+  name: string;
+  cssCode: string;
+}
+
+export interface NoonnnuFont {
+  id: string;
+  nameKo: string;
+  nameEn: string;
+  fontFamily: string;
+  category: 'gothic' | 'serif' | 'handwriting' | 'decorative' | 'monospace';
+  cssCode: string;
+  provider: string;
+  originalUrl?: string;
+  description?: string;
+  weights?: FontWeight[];
+}
+
+// 엑셀에서 자동 생성된 폰트 목록
+export const NOONNU_FONTS: NoonnnuFont[] = [
+  {
+    id: 'hansuwonhanullim',
+    nameKo: '한수원 한울림체',
+    nameEn: 'HansuwonHanullim',
+    fontFamily: 'UnknownFont',
+    category: 'decorative' as const,
+    provider: '한수원 한울림체폰트로 만든 디자인 올리기',
+    cssCode: `@font-face {
+    font-family: 'HansuwonHanullim';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/KHNPHU.woff') format('woff');
+    font-weight: normal;
+    font-display: swap;
+}`,
+    weights: [
+      { weight: 400, name: 'Regular', cssCode: `@font-face {
+    font-family: 'HansuwonHanullim';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/KHNPHU.woff') format('woff');
+    font-weight: normal;
+    font-display: swap;
+}` }
+    ]
+  }
+];
+
+// 수집된 폰트들
+export const STUDIO_FONTS = [
+  // Google Fonts (기존 유지)
+  { 
+    id: 'noto-sans-kr',
+    nameKo: 'Noto Sans KR',
+    nameEn: 'Noto Sans KR',
+    fontFamily: '"Noto Sans KR", sans-serif',
+    category: 'gothic' as const,
+    provider: 'Google Fonts',
+    cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;300;400;500;700;900&display=swap");',
+    weights: [
+      { weight: 100, name: 'Thin', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100&display=swap");' },
+      { weight: 300, name: 'Light', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300&display=swap");' },
+      { weight: 400, name: 'Regular', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400&display=swap");' },
+      { weight: 500, name: 'Medium', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500&display=swap");' },
+      { weight: 700, name: 'Bold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700&display=swap");' },
+      { weight: 900, name: 'Black', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=swap");' }
+    ]
+  },
+  { 
+    id: 'noto-serif-kr',
+    nameKo: 'Noto Serif KR',
+    nameEn: 'Noto Serif KR',
+    fontFamily: '"Noto Serif KR", serif',
+    category: 'serif' as const,
+    provider: 'Google Fonts',
+    cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;600;700;900&display=swap");',
+    weights: [
+      { weight: 200, name: 'ExtraLight', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200&display=swap");' },
+      { weight: 300, name: 'Light', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300&display=swap");' },
+      { weight: 400, name: 'Regular', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400&display=swap");' },
+      { weight: 500, name: 'Medium', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500&display=swap");' },
+      { weight: 600, name: 'SemiBold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600&display=swap");' },
+      { weight: 700, name: 'Bold', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&display=swap");' },
+      { weight: 900, name: 'Black', cssCode: '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&display=swap");' }
+    ]
+  },
+  // 눈누 폰트 추가
+  ...NOONNU_FONTS
+];

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createBillingAuthRequest, SUBSCRIPTION_PLANS } from "@/lib/payments/toss-billing-supabase";
+import { getSubscriptionStatus, determinePlanChangeType } from "@/lib/subscription/subscription-manager";
+import { type PlanType } from "@/lib/subscription/plan-config";
 
 // 빌링키 등록 요청 (구독 시작)
 export async function POST(req: NextRequest) {
   try {
     console.log('=== Billing register API called ===');
+    console.log('환경변수 체크:', {
+      tossClientKey: process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ? 'present' : 'missing',
+      tossSecretKey: process.env.TOSS_SECRET_KEY ? 'present' : 'missing',
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'present' : 'missing'
+    });
     
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -22,11 +29,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('Request body:', body);
     
-    const { planId, referralCode, discountRate, finalAmount } = body;
+    const { planId, referralCode, discountRate, finalAmount, paymentMethod } = body;
     
     console.log('Plan ID received:', planId);
     
-    if (!planId || !["FREE", "PRO", "PREMIUM"].includes(planId)) {
+    if (!planId || !["FREE", "STARTER", "PRO", "PREMIUM"].includes(planId)) {
       console.log('Invalid plan ID:', planId);
       return NextResponse.json(
         { error: "유효하지 않은 플랜입니다" },
@@ -149,16 +156,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 🔍 기존 구독 상태 확인
+    console.log('기존 구독 상태 확인 중...');
+    const subscriptionStatus = await getSubscriptionStatus(finalDbUser.id);
+    console.log('구독 상태:', subscriptionStatus);
+    
+    // 플랜 변경 유형 판단
+    const changeType = determinePlanChangeType(subscriptionStatus.currentPlan, planId as PlanType);
+    console.log('플랜 변경 유형:', changeType, `(${subscriptionStatus.currentPlan} → ${planId})`);
+    
+    // 동일 플랜 구독 시도 차단
+    if (changeType === 'same') {
+      console.log('동일한 플랜 구독 시도 차단');
+      return NextResponse.json(
+        { 
+          error: "이미 동일한 플랜을 사용 중입니다",
+          currentPlan: subscriptionStatus.currentPlan,
+          changeType: 'same'
+        },
+        { status: 400 }
+      );
+    }
+
     // 빌링키 등록 요청 생성 (v2 API)
     console.log('Creating billing auth request with discount...');
-    console.log('Discount rate:', discountRate, 'Final amount:', finalAmount);
+    console.log('Discount rate:', discountRate, 'Final amount:', finalAmount, 'Change type:', changeType);
+    
+    // 결제수단 매핑 (프론트엔드 값을 DB enum 값으로 변환)
+    const paymentMethodMapping: Record<string, string> = {
+      '카드': 'CARD',
+      '토스페이': 'TOSSPAY', 
+      '카카오페이': 'KAKAOPAY'
+    };
+    const mappedPaymentMethod = paymentMethodMapping[paymentMethod] || 'CARD';
     
     const billingAuthRequest = await createBillingAuthRequest(
       finalDbUser.id,
       planId,
       user.email || "",
       user.user_metadata?.full_name || user.email?.split('@')[0] || undefined,
-      finalAmount // 할인된 금액 전달
+      finalAmount, // 할인된 금액 전달
+      mappedPaymentMethod // 결제수단 전달
     );
     
     console.log('Billing auth request created:', billingAuthRequest);
@@ -171,6 +209,14 @@ export async function POST(req: NextRequest) {
         discountRate,
         finalAmount
       },
+      subscriptionInfo: {
+        changeType,
+        currentPlan: subscriptionStatus.currentPlan,
+        hasActiveSubscription: subscriptionStatus.hasActiveSubscription,
+        isUpgrade: changeType === 'upgrade',
+        isDowngrade: changeType === 'downgrade',
+        isNew: changeType === 'new'
+      }
     };
     
     console.log('Returning successful response:', response);

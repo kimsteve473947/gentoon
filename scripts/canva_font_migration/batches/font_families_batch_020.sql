@@ -1,0 +1,41 @@
+-- font_families 배치 20
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '5e3abb38-9b97-4416-9dc4-37f12bac514c', '어비 다빈체', 'AviDavinci', 'AviDavinci', 'decorative', '어비 다빈체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/184', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '41b544ec-0172-4203-84f9-4194b37f5888', '어비 링링체', 'AbeeRingring', 'AbeeRingring', 'decorative', '어비 링링체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/185', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'fa4c6dc2-2636-4bb7-a936-2304109b5b77', '어비 류가체', 'AvyRyu', 'AvyRyu', 'decorative', '어비 류가체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/186', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'dd9ed0a6-353c-4246-9423-2270bb05d275', '어비 세현체', 'AvieSehyun', 'AvieSehyun', 'decorative', '어비 세현체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/187', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '9c9f91a2-32ea-4618-b30c-2fe1426587f4', '어비 슬기로운생활체', 'AbiWiseLife', 'AbiWiseLife', 'decorative', '어비 슬기로운생활체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/188', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '11cc79cd-4af4-4fc2-bdc0-b10b22fae630', '어비 단순그녀체', 'ABiSimpleGirl', 'ABiSimpleGirl', 'decorative', '어비 단순그녀체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/189', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c01e4189-92b9-4637-9efe-4e3e6ce26fc0', '어비 하늘비체', 'ABeeHaNeulBi', 'ABeeHaNeulBi', 'decorative', '어비 하늘비체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/190', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'db78981e-5a60-4c41-b4c8-41b6fb2f6c50', '어비 송송체', 'AbiSongsong', 'AbiSongsong', 'decorative', '어비 송송체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/191', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '0a282348-b6fd-4e27-b5a4-e4d4f2a3dbff', '어비 소윤체', 'AbiSoyoun', 'AbiSoyoun', 'decorative', '어비 소윤체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/192', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c257a5c0-531f-4eea-9308-a58f79243bd7', '어비 스트로베리체', 'AvieStrawberry', 'AvieStrawberry', 'decorative', '어비 스트로베리체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/193', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'c7d74c57-3479-48dc-8558-ff4524e14031', '어비 선홍체', 'AebiSeonhong', 'AebiSeonhong', 'decorative', '어비 선홍체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/194', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f3f0f410-23c4-47a9-9b7d-e352a53a6e22', '어비 톡기체', 'AebiTokgichae', 'AebiTokgichae', 'decorative', '어비 톡기체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/195', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '7735a333-6beb-425a-84e8-8c0143856a9e', '어비 토모체', 'EobiTomo', 'EobiTomo', 'decorative', '어비 토모체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/196', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( 'f6f9d017-f432-4345-8585-266de9ef7a91', '어비 순수결정체', 'AviPureCrystal', 'AviPureCrystal', 'decorative', '어비 순수결정체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/197', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '5db73880-048b-4412-9044-9e364640c2a5', '어비 유종체', 'AviYuJong', 'AviYuJong', 'decorative', '어비 유종체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/198', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '0f96efa7-428a-476a-872f-7cc33f744355', '어비 유진체', 'AviEugene', 'AviEugene', 'decorative', '어비 유진체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/199', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '84cf1bd4-a7af-46a6-9c1b-8cafbd12bcc0', '어비 못된여자체', 'UhbiNaughtyGirl', 'UhbiNaughtyGirl', 'decorative', '어비 못된여자체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/200', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '413f287e-0db7-40ff-a862-c91ad6803d69', '어비 위윰체', 'AviYum', 'AviYum', 'decorative', '어비 위윰체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/201', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '99906f40-227d-4a5e-b366-b7826f8be0f9', '어비 얀느체', 'AviYanne', 'AviYanne', 'decorative', '어비 얀느체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/202', NULL, 0, true, false, NOW(), NOW() );
+
+INSERT INTO font_family ( id, "nameKo", "nameEn", "fontFamily", category, provider, "licenseType", "originalUrl", description, "totalUsageCount", "isActive", "isFeatured", "createdAt", "updatedAt" ) VALUES ( '8af37065-930e-496c-985a-605d8aa6c185', '어비 예희체', 'EobiYehi', 'EobiYehi', 'decorative', '어비 예희체폰트로 만든 디자인 올리기', '사용 가능', 'https://noonnu.cc/font_page/203', NULL, 0, true, false, NOW(), NOW() );

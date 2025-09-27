@@ -97,11 +97,8 @@ export async function ensureUserExists(authUser: any): Promise<{
       devLog(`구독 생성 완료: ${plan} 플랜`);
     }
 
-    // 5. 저장소 사용량 초기화
-    const storageLimit = plan === 'ADMIN' ? 100 * 1024 * 1024 * 1024 : // 100GB
-                         plan === 'PREMIUM' ? 5 * 1024 * 1024 * 1024 : // 5GB
-                         plan === 'PRO' ? 1 * 1024 * 1024 * 1024 : // 1GB
-                         100 * 1024 * 1024; // 100MB (FREE)
+    // 5. 저장소 사용량 초기화 (plan-config.ts와 동기화)
+    const storageLimit = PLAN_CONFIGS[plan as keyof typeof PLAN_CONFIGS]?.storageLimit || PLAN_CONFIGS.FREE.storageLimit;
 
     const { error: storageError } = await supabase
       .from('user_storage')

@@ -81,8 +81,8 @@ export class SecureLogger {
       console.error(`[ERROR] ${message}`, sanitizedError, sanitizedContext);
     }
     
-    // 파일에 저장
-    this.writeToFile('error', message, errorData);
+    // 파일에 저장 (개발환경에서는 스킵)
+    SecureLogger.writeToFile('error', message, errorData);
   }
 
   /**

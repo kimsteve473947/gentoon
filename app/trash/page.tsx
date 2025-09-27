@@ -451,8 +451,42 @@ export default function TrashPageOptimized() {
   const handleBulkRestore = useCallback(async () => {
     if (selectedProjects.size === 0) return;
     
-    for (const projectId of selectedProjects) {
-      await handleRestore(projectId);
+    // 선택된 프로젝트들을 처리 중으로 설정
+    const projectIdsArray = Array.from(selectedProjects);
+    setProcessingIds(prev => new Set([...prev, ...projectIdsArray]));
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // 순차적으로 복원 (복원은 병렬처리하지 않음)
+      for (const projectId of selectedProjects) {
+        try {
+          await handleRestore(projectId);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to restore project ${projectId}:`, error);
+          errorCount++;
+        }
+      }
+      
+      setSelectedProjects(new Set());
+      
+      if (errorCount === 0) {
+        setSuccessMessage(`${successCount}개 프로젝트가 복원되었습니다.`);
+      } else {
+        setSuccessMessage(`${successCount}개 복원 완료, ${errorCount}개 실패`);
+      }
+    } catch (error) {
+      console.error('Bulk restore error:', error);
+      alert('일괄 복원 중 오류가 발생했습니다.');
+    } finally {
+      // 처리 중 상태 해제
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        projectIdsArray.forEach(id => newSet.delete(id));
+        return newSet;
+      });
     }
   }, [selectedProjects, handleRestore]);
 
@@ -463,31 +497,45 @@ export default function TrashPageOptimized() {
       return;
     }
     
-    let successCount = 0;
-    let errorCount = 0;
+    // 선택된 프로젝트들을 처리 중으로 설정
+    const projectIdsArray = Array.from(selectedProjects);
+    setProcessingIds(prev => new Set([...prev, ...projectIdsArray]));
     
     try {
-      for (const projectId of selectedProjects) {
-        try {
-          await handlePermanentDelete(projectId, undefined, true);
-          successCount++;
-        } catch (error) {
-          console.error(`Failed to delete project ${projectId}:`, error);
-          errorCount++;
-        }
-      }
+      // 🚀 새로운 일괄 삭제 API 사용
+      const response = await fetch('/api/projects/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectIds: projectIdsArray, 
+          hardDelete: true 
+        }),
+      });
+
+      const result = await response.json();
       
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      }
+
+      // 성공한 프로젝트들을 목록에서 제거
+      setDeletedProjects(prev => prev.filter(p => !selectedProjects.has(p.id)));
       setSelectedProjects(new Set());
       
-      if (errorCount === 0) {
-        setSuccessMessage(`${successCount}개 프로젝트가 영구 삭제되었습니다.`);
-      } else {
-        setSuccessMessage(`${successCount}개 삭제 완료, ${errorCount}개 실패`);
-      }
+      setSuccessMessage(result.message || `${result.deletedCount}개 프로젝트가 영구 삭제되었습니다.`);
+      
     } catch (error) {
       console.error('Bulk delete error:', error);
+      alert('일괄 삭제 중 오류가 발생했습니다.');
+    } finally {
+      // 처리 중 상태 해제
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        projectIdsArray.forEach(id => newSet.delete(id));
+        return newSet;
+      });
     }
-  }, [selectedProjects, handlePermanentDelete]);
+  }, [selectedProjects]);
 
   const closeSuccessMessage = useCallback(() => {
     setSuccessMessage(null);

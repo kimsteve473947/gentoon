@@ -1,8 +1,27 @@
 {
+  "functions": {
+    "app/api/cron/billing/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/recurring-payments/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/process-pending-downgrades/route.ts": {
+      "maxDuration": 300
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/reset-tokens",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/billing",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/process-pending-downgrades",
+      "schedule": "0 1 * * *"
     }
   ]
 }

@@ -64,8 +64,12 @@ export async function middleware(request: NextRequest) {
     const authPaths = ['/sign-in']
     const path = request.nextUrl.pathname
 
+    // 개발 환경에서 테스트 API는 인증 제외
+    const testPaths = ['/api/payments/test', '/api/debug']
+    const isTestPath = process.env.NODE_ENV === 'development' && testPaths.some(p => path.startsWith(p))
+
     // 경로 체크
-    const isProtected = protectedPaths.some(p => path.startsWith(p))
+    const isProtected = protectedPaths.some(p => path.startsWith(p)) && !isTestPath
     const isAuthPath = authPaths.some(p => path.startsWith(p))
 
     // 보호된 경로에 비로그인 사용자가 접근하는 경우
@@ -368,12 +372,12 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   // CSP (Content Security Policy)
   const cspValue = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel.app https://js.tosspayments.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel.app https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
     "img-src 'self' data: blob: https://*.supabase.co https://*.vercel-storage.com https://storage.googleapis.com https://*.googleusercontent.com https://*.kakaocdn.net http://*.kakaocdn.net https://k.kakaocdn.net http://k.kakaocdn.net https://mud-kage.kakao.com http://mud-kage.kakao.com",
-    "connect-src 'self' https://*.supabase.co https://api.tosspayments.com https://generativelanguage.googleapis.com wss://*.supabase.co",
+    "connect-src 'self' https://*.supabase.co https://api.tosspayments.com https://log.tosspayments.com https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com https://generativelanguage.googleapis.com wss://*.supabase.co",
     "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
-    "frame-src 'none'",
+    "frame-src 'self' https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'"

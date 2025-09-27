@@ -29,22 +29,34 @@ interface Character {
   thumbnailUrl?: string;
 }
 
+interface Element {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  thumbnailUrl?: string;
+}
+
 interface ScriptPanel {
   order: number;
   prompt: string;
   characters: string[];
+  elements: string[];
 }
 
 interface AIScriptGeneratorProps {
   onScriptGenerated: (panels: ScriptPanel[]) => void;
+  onApplyToCanvas?: (panels: ScriptPanel[]) => void;
   className?: string;
 }
 
-export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGeneratorProps) {
+export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, className }: AIScriptGeneratorProps) {
   const [storyPrompt, setStoryPrompt] = useState('');
   const [selectedPanelCount, setSelectedPanelCount] = useState<'3-5' | '6-8' | '8-10'>('3-5');
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  const [selectedElements, setSelectedElements] = useState<string[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [elements, setElements] = useState<Element[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedScript, setGeneratedScript] = useState<ScriptPanel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,10 +74,10 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
   ] as const;
 
   useEffect(() => {
-    loadCharacters();
+    loadCharactersAndElements();
   }, []);
 
-  const loadCharacters = async () => {
+  const loadCharactersAndElements = async () => {
     try {
       setLoading(true);
       
@@ -80,15 +92,24 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
 
       if (!userData) return;
 
-      const { data: charactersData } = await supabase
-        .from('character')
-        .select('id, name, description, thumbnailUrl')
-        .eq('userId', userData.id)
-        .order('createdAt', { ascending: false });
+      // 캐릭터와 요소를 병렬로 로드
+      const [charactersResult, elementsResult] = await Promise.all([
+        supabase
+          .from('character')
+          .select('id, name, description, thumbnailUrl')
+          .eq('userId', userData.id)
+          .order('createdAt', { ascending: false }),
+        supabase
+          .from('element')
+          .select('id, name, description, category, thumbnailUrl')
+          .eq('userId', userData.id)
+          .order('createdAt', { ascending: false })
+      ]);
 
-      setCharacters(charactersData || []);
+      setCharacters(charactersResult.data || []);
+      setElements(elementsResult.data || []);
     } catch (error) {
-      console.error('캐릭터 로딩 실패:', error);
+      console.error('캐릭터/요소 로딩 실패:', error);
     } finally {
       setLoading(false);
     }
@@ -102,6 +123,14 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
     );
   };
 
+  const handleElementToggle = (elementId: string) => {
+    setSelectedElements(prev => 
+      prev.includes(elementId)
+        ? prev.filter(id => id !== elementId)
+        : [...prev, elementId]
+    );
+  };
+
   const generateScript = async () => {
     if (!storyPrompt.trim()) {
       alert('스토리 아이디어를 입력해주세요');
@@ -111,11 +140,15 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
     setIsGenerating(true);
     
     try {
-      // 실제로는 AI API를 호출하여 대본을 생성
-      // 여기서는 임시로 mock 데이터 생성
+      // 선택된 캐릭터와 요소 정보 수집
       const characterNames = selectedCharacters.map(id => {
         const char = characters.find(c => c.id === id);
         return char?.name || '';
+      }).filter(Boolean);
+
+      const elementNames = selectedElements.map(id => {
+        const element = elements.find(e => e.id === id);
+        return element ? `${element.name} (${element.description})` : '';
       }).filter(Boolean);
 
       const panelCount = selectedPanelCount === '3-5' ? 4 : 
@@ -130,6 +163,7 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
         body: JSON.stringify({
           storyPrompt: storyPrompt.trim(),
           characterNames,
+          elementNames,
           panelCount,
           style: 'webtoon'
         })
@@ -273,6 +307,53 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
           )}
         </div>
 
+        {/* 요소 선택 - 🚨 FORCED VISIBLE FOR DEBUGGING */}
+        <div className="space-y-3" style={{backgroundColor: '#ffeb3b', padding: '10px', border: '2px solid red'}}>
+          <label className="text-sm font-medium text-gray-700">
+            🎯 등장 요소 (선택사항) - Elements: {elements.length}
+          </label>
+          {elements.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 bg-gray-50 rounded-lg">
+              <FileText className="h-6 w-6 mx-auto mb-2" />
+              <p className="text-sm">등록된 요소가 없습니다 (개발 모드: 강제 표시)</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {elements.map((element) => (
+                <div
+                  key={element.id}
+                  className={cn(
+                    "flex items-center gap-3 p-2 border rounded-lg cursor-pointer transition-all",
+                    selectedElements.includes(element.id)
+                      ? "border-green-300 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  )}
+                  onClick={() => handleElementToggle(element.id)}
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={element.thumbnailUrl} alt={element.name} />
+                    <AvatarFallback className="bg-green-100 text-green-700 text-xs">
+                      {element.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{element.name}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {element.description}
+                    </div>
+                    <div className="text-xs text-blue-600 font-medium">
+                      {element.category}
+                    </div>
+                  </div>
+                  {selectedElements.includes(element.id) && (
+                    <Check className="h-4 w-4 text-green-600" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* 생성 버튼 */}
         <Button
           onClick={generateScript}
@@ -297,14 +378,25 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">생성된 대본</h3>
-              <Button
-                onClick={useGeneratedScript}
-                size="sm"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                웹툰에 적용하기
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => onApplyToCanvas?.(generatedScript)}
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  패널에 적용하기
+                </Button>
+                <Button
+                  onClick={useGeneratedScript}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  한꺼번에 생성하기
+                </Button>
+              </div>
             </div>
             
             <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -334,11 +426,16 @@ export function AIScriptGenerator({ onScriptGenerated, className }: AIScriptGene
                     {panel.prompt}
                   </p>
                   
-                  {panel.characters.length > 0 && (
-                    <div className="flex gap-1 mt-2">
+                  {(panel.characters.length > 0 || panel.elements?.length > 0) && (
+                    <div className="flex flex-wrap gap-1 mt-2">
                       {panel.characters.map((charName, charIndex) => (
-                        <Badge key={charIndex} variant="secondary" className="text-xs">
-                          {charName}
+                        <Badge key={`char-${charIndex}`} variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                          👤 {charName}
+                        </Badge>
+                      ))}
+                      {panel.elements?.map((elementName, elementIndex) => (
+                        <Badge key={`elem-${elementIndex}`} variant="secondary" className="text-xs bg-green-100 text-green-700">
+                          🎯 {elementName.split(' (')[0]}
                         </Badge>
                       ))}
                     </div>

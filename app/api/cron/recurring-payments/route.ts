@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processRecurringPayments } from "@/lib/payments/toss-billing-v2";
+import { processRecurringPayments } from "@/lib/payments/toss-billing-supabase";
 
 export async function POST(req: NextRequest) {
   try {

@@ -18,7 +18,8 @@ import {
   Loader2,
   X,
   ImageIcon,
-  User
+  User,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createBrowserClient } from '@supabase/ssr';
@@ -31,7 +32,7 @@ interface AddCharacterModalProps {
   canvasRatio?: '4:5' | '1:1' | '16:9'; // 현재 캔버스 비율
 }
 
-type CreationMode = 'upload' | 'ai' | null;
+type CreationMode = 'upload' | 'ai' | 'convert' | null;
 
 export function AddCharacterModal({ 
   open, 
@@ -45,6 +46,10 @@ export function AddCharacterModal({
   const [aiPrompt, setAiPrompt] = useState('');
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [personImage, setPersonImage] = useState<File | null>(null);
+  const [personPreviewUrl, setPersonPreviewUrl] = useState<string | null>(null);
+  const [convertedCharacterUrl, setConvertedCharacterUrl] = useState<string | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitModalData, setLimitModalData] = useState<{
@@ -54,6 +59,7 @@ export function AddCharacterModal({
   } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const personFileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -67,6 +73,10 @@ export function AddCharacterModal({
     setAiPrompt('');
     setUploadedImage(null);
     setPreviewUrl(null);
+    setPersonImage(null);
+    setPersonPreviewUrl(null);
+    setConvertedCharacterUrl(null);
+    setIsConverting(false);
     setIsCreating(false);
     setShowLimitModal(false);
     setLimitModalData(null);
@@ -74,7 +84,7 @@ export function AddCharacterModal({
 
   // 모달 닫기
   const handleClose = () => {
-    if (!isCreating) {
+    if (!isCreating && !isConverting) {
       resetModal();
       onOpenChange(false);
     }
@@ -116,6 +126,44 @@ export function AddCharacterModal({
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('이미지 리사이즈 실패:', error);
+      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해주세요.');
+    }
+  };
+
+  // 사람 사진 업로드 처리
+  const handlePersonImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 이미지 파일만 허용
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    // 파일 크기 제한 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('파일 크기는 10MB를 초과할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setPersonImage(file);
+      
+      // 미리보기 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setPersonPreviewUrl(dataUrl);
+        console.log(`✅ 사람 이미지 미리보기 생성 완료: ${file.name}`);
+      };
+      reader.onerror = () => {
+        console.error('❌ 파일 읽기 실패');
+        alert('이미지 파일을 읽을 수 없습니다.');
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('이미지 처리 실패:', error);
       alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해주세요.');
     }
   };
@@ -343,6 +391,41 @@ export function AddCharacterModal({
     return result.imageUrl;
   };
 
+  // 사람을 캐릭터로 변환 (미리보기용)
+  const handleConvertPersonToCharacter = async () => {
+    if (!personImage) {
+      alert('사람 사진을 선택해주세요.');
+      return;
+    }
+
+    try {
+      setIsConverting(true);
+      
+      const formData = new FormData();
+      formData.append('image', personImage);
+      formData.append('aspectRatio', canvasRatio);
+
+      const response = await fetch('/api/ai/character/convert', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '사람을 캐릭터로 변환하는데 실패했습니다.');
+      }
+
+      const result = await response.json();
+      setConvertedCharacterUrl(result.imageUrl);
+      
+    } catch (error) {
+      console.error('변환 실패:', error);
+      alert(error instanceof Error ? error.message : '이미지 변환 중 오류가 발생했습니다.');
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   // 캐릭터 생성/저장
   const handleCreateCharacter = async () => {
     if (!name.trim()) {
@@ -362,6 +445,11 @@ export function AddCharacterModal({
 
     if (mode === 'ai' && !aiPrompt.trim()) {
       alert('AI 생성 프롬프트를 입력해주세요.');
+      return;
+    }
+
+    if (mode === 'convert' && !convertedCharacterUrl) {
+      alert('먼저 사람 사진을 캐릭터로 변환해주세요.');
       return;
     }
 
@@ -482,6 +570,38 @@ export function AddCharacterModal({
           console.error('❌ AI character multi-ratio processing API error:', processingError);
           // API 오류가 발생해도 원본 이미지는 저장되도록 계속 진행
         }
+      } else if (mode === 'convert' && convertedCharacterUrl) {
+        // 이미 변환된 캐릭터 이미지 사용
+        imageUrl = convertedCharacterUrl;
+        referenceImages = [imageUrl];
+        
+        // 변환된 이미지도 API를 통한 멀티 비율 처리
+        console.log('👤 Person-to-character API 기반 multi-ratio processing 시작...');
+        try {
+          const processingResponse = await fetch('/api/characters/process-images', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              referenceImages,
+              userId: userData.id
+            })
+          });
+
+          const processingResult = await processingResponse.json();
+          
+          if (processingResult.success && processingResult.ratioImages) {
+            ratioImages = processingResult.ratioImages;
+            console.log('✅ Person-to-character multi-ratio processing completed:', ratioImages);
+          } else {
+            console.error('❌ Person-to-character multi-ratio processing failed:', processingResult.error);
+            // 실패해도 원본 이미지는 저장되도록 계속 진행
+          }
+        } catch (processingError) {
+          console.error('❌ Person-to-character multi-ratio processing API error:', processingError);
+          // API 오류가 발생해도 원본 이미지는 저장되도록 계속 진행
+        }
       }
 
       // 캐릭터 API를 통해 데이터베이스에 저장
@@ -540,7 +660,7 @@ export function AddCharacterModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            새 캐릭터 직접 추가
+            새 캐릭터 추가
           </DialogTitle>
           <DialogDescription>
             캐릭터를 생성하여 웹툰에서 일관된 외모로 활용하세요
@@ -551,15 +671,26 @@ export function AddCharacterModal({
           {/* 생성 방식 선택 */}
           {!mode && (
             <div className="space-y-4">
-              <div className="text-center">
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setMode('upload')}
-                  className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-300 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all w-full"
+                  className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-300 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all"
                 >
                   <Upload className="h-8 w-8 text-slate-400" />
                   <div className="text-center">
                     <p className="font-medium text-slate-700">이미지 업로드</p>
                     <p className="text-sm text-slate-500">컴퓨터에서 직접 선택</p>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => setMode('convert')}
+                  className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-300 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
+                >
+                  <Users className="h-8 w-8 text-slate-400" />
+                  <div className="text-center">
+                    <p className="font-medium text-slate-700">사람 → 캐릭터</p>
+                    <p className="text-sm text-slate-500">사람 사진을 캐릭터로 변환</p>
                   </div>
                 </button>
               </div>
@@ -658,23 +789,116 @@ export function AddCharacterModal({
             </div>
           )}
 
-          {/* AI 생성 모드 */}
-          {mode === 'ai' && (
+          {/* 사람 → 캐릭터 변환 모드 */}
+          {mode === 'convert' && (
             <div className="space-y-4">
-              <Label className="text-base font-medium">AI 생성 프롬프트</Label>
+              <Label className="text-base font-medium">1단계: 사람 사진 업로드</Label>
               
-              <Textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="원하는 캐릭터의 외모를 상세히 설명해주세요&#10;예: 20대 여성, 긴 검은 머리, 둥근 안경, 대학생 스타일, 밝은 미소"
-                className="min-h-[100px]"
-              />
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
-                  💡 <strong>팁:</strong> 나이, 성별, 헤어스타일, 옷차림, 표정 등을 구체적으로 설명할수록 더 정확한 캐릭터가 생성됩니다.
-                </p>
+              <div className="space-y-3">
+                {!personImage ? (
+                  <div
+                    onClick={() => personFileInputRef.current?.click()}
+                    className="flex flex-col items-center gap-4 p-8 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all cursor-pointer"
+                  >
+                    <Users className="h-12 w-12 text-blue-400" />
+                    <div className="text-center">
+                      <p className="font-medium text-slate-700">사람 사진 선택</p>
+                      <p className="text-sm text-slate-500 mt-1">
+                        PNG, JPG 파일 (최대 10MB)
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={personPreviewUrl!}
+                      alt="사람 사진 미리보기"
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        setPersonImage(null);
+                        setPersonPreviewUrl(null);
+                        setConvertedCharacterUrl(null);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                <input
+                  ref={personFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePersonImageUpload}
+                  className="hidden"
+                />
               </div>
+
+              {/* AI 변환 버튼 */}
+              {personImage && !convertedCharacterUrl && (
+                <Button
+                  onClick={handleConvertPersonToCharacter}
+                  disabled={isConverting}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                >
+                  {isConverting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      AI 변환 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      캐릭터로 변환하기
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* 변환된 캐릭터 미리보기 */}
+              {convertedCharacterUrl && (
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">2단계: 변환된 캐릭터 확인</Label>
+                  <div className="relative">
+                    <img
+                      src={convertedCharacterUrl}
+                      alt="변환된 캐릭터"
+                      className="w-full h-48 object-cover rounded-lg border-2 border-green-300"
+                    />
+                    <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+                      변환 완료
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="absolute top-2 right-2 bg-white"
+                      onClick={() => {
+                        setConvertedCharacterUrl(null);
+                      }}
+                    >
+                      다시 변환
+                    </Button>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm text-green-800">
+                      ✅ <strong>변환 완료!</strong> 결과가 마음에 드시면 아래에서 캐릭터 정보를 입력하고 생성하세요.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {!convertedCharacterUrl && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
+                    ✨ <strong>AI 변환:</strong> 업로드된 사람 사진을 AI가 웹툰 스타일 캐릭터로 자동 변환합니다. 얼굴이 잘 보이는 정면 사진을 사용하시면 더 좋은 결과를 얻을 수 있습니다.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -684,7 +908,7 @@ export function AddCharacterModal({
               <Button
                 variant="outline"
                 onClick={() => setMode(null)}
-                disabled={isCreating}
+                disabled={isCreating || isConverting}
                 className="flex-1"
               >
                 이전
@@ -692,17 +916,30 @@ export function AddCharacterModal({
               
               <Button
                 onClick={handleCreateCharacter}
-                disabled={isCreating || !name.trim() || !description.trim()}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                disabled={
+                  isCreating || 
+                  isConverting || 
+                  !name.trim() || 
+                  !description.trim() ||
+                  (mode === 'convert' && !convertedCharacterUrl)
+                }
+                className={cn(
+                  "flex-1",
+                  mode === 'convert' 
+                    ? "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                    : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                )}
               >
                 {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {mode === 'ai' ? '생성 중...' : '업로드 중...'}
+                    {'캐릭터 생성 중...'}
                   </>
                 ) : (
                   <>
-                    {mode === 'ai' ? (
+                    {mode === 'convert' ? (
+                      <Users className="h-4 w-4 mr-2" />
+                    ) : mode === 'ai' ? (
                       <Sparkles className="h-4 w-4 mr-2" />
                     ) : (
                       <Upload className="h-4 w-4 mr-2" />

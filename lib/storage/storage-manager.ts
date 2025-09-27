@@ -1,14 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { STORAGE_LIMITS } from '@/lib/subscription/plan-config'
 
-// 멤버십별 용량 제한 (바이트 단위) - 수익성 최적화
-export const STORAGE_LIMITS = {
-  FREE: 300 * 1024 * 1024,             // 300MB (무료 체험용)
-  PRO: 5 * 1024 * 1024 * 1024,         // 5GB (프로 플랜)  
-  PREMIUM: 20 * 1024 * 1024 * 1024,    // 20GB (프리미엄 플랜)
-}
+// Re-export STORAGE_LIMITS for external use
+export { STORAGE_LIMITS }
 
-// 멤버십 타입
-export type MembershipType = 'FREE' | 'PRO' | 'PREMIUM'
+// 멤버십 타입 (중앙 설정 사용)
+export type MembershipType = 'FREE' | 'STARTER' | 'PRO' | 'PREMIUM' | 'ADMIN'
 
 // 바이트를 읽기 쉬운 형식으로 변환
 export function formatBytes(bytes: number, decimals = 2): string {
@@ -59,22 +56,44 @@ export async function getUserStorage(userId: string) {
   return data
 }
 
-// 멤버십에 따른 최대 용량 업데이트
+// 멤버십에 따른 최대 용량 업데이트 (안전한 방식)
 export async function updateStorageLimit(userId: string, membership: MembershipType) {
   const supabase = await createClient()
-  
   const maxBytes = STORAGE_LIMITS[membership]
   
-  const { error } = await supabase
+  // 먼저 기존 레코드 확인
+  const { data: existingStorage } = await supabase
     .from('user_storage')
-    .upsert({
-      userId: userId,
-      max_bytes: maxBytes
-    }, {
-      onConflict: 'userId'
-    })
+    .select('id')
+    .eq('userId', userId)
+    .single()
   
-  if (error) throw error
+  let result;
+  if (existingStorage) {
+    // 기존 레코드 업데이트
+    result = await supabase
+      .from('user_storage')
+      .update({
+        max_bytes: maxBytes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('userId', userId)
+  } else {
+    // 새 레코드 생성
+    result = await supabase
+      .from('user_storage')
+      .insert({
+        userId: userId,
+        used_bytes: 0,
+        max_bytes: maxBytes,
+        file_count: 0
+      })
+  }
+  
+  if (result.error) {
+    console.error('스토리지 한도 업데이트 오류:', result.error)
+    throw result.error
+  }
   
   console.log(`✅ [Storage] 사용자 ${userId.slice(0, 8)} 스토리지 한도 업데이트: ${membership} (${formatBytes(maxBytes)})`)
 }
@@ -101,6 +120,9 @@ export async function autoSetStorageLimitBySubscription(userId: string) {
   let membership: MembershipType = 'FREE'
   
   switch (plan) {
+    case 'STARTER':
+      membership = 'STARTER'
+      break
     case 'PRO':
       membership = 'PRO'
       break

@@ -52,7 +52,6 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-3">고객지원</h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li>이메일: contact@gentoon.com</li>
               <li>회사명: 져드코퍼레이션</li>
               <li>대표자: 김중휘</li>
             </ul>

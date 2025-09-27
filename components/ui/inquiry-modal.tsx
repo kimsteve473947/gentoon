@@ -6,7 +6,7 @@ import { Button } from './button';
 import { Input } from './input';
 import { Textarea } from './textarea';
 import { Label } from './label';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from './toast';
 
 interface InquiryModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ interface AttachedFile {
 }
 
 export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
-  const { toast } = useToast();
+  const { showError, showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -43,11 +43,7 @@ export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
     // 최대 4개 파일 제한
     const availableSlots = 4 - attachedFiles.length;
     if (files.length > availableSlots) {
-      toast({
-        title: "파일 업로드 제한",
-        description: `최대 4개 파일까지 업로드 가능합니다. (현재 ${availableSlots}개 추가 가능)`,
-        variant: "destructive"
-      });
+      showError(`최대 4개 파일까지 업로드 가능합니다. (현재 ${availableSlots}개 추가 가능)`);
       return;
     }
 
@@ -56,11 +52,7 @@ export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
     for (const file of files) {
       // 파일 크기 제한 (10MB)
       if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "파일 크기 초과",
-          description: `${file.name}: 파일 크기는 10MB 이하여야 합니다.`,
-          variant: "destructive"
-        });
+        showError(`${file.name}: 파일 크기는 10MB 이하여야 합니다.`);
         continue;
       }
 
@@ -99,22 +91,14 @@ export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
     e.preventDefault();
     
     if (!formData.name || !formData.email || !formData.subject || !formData.message) {
-      toast({
-        title: "필수 정보 누락",
-        description: "이름, 이메일, 제목, 문의내용을 모두 입력해주세요.",
-        variant: "destructive"
-      });
+      showError("이름, 이메일, 제목, 문의내용을 모두 입력해주세요.");
       return;
     }
 
     // 이메일 형식 검증
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "이메일 형식 오류",
-        description: "올바른 이메일 주소를 입력해주세요.",
-        variant: "destructive"
-      });
+      showError("올바른 이메일 주소를 입력해주세요.");
       return;
     }
 
@@ -141,11 +125,7 @@ export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
       const result = await response.json();
 
       if (result.success) {
-        toast({
-          title: "문의가 접수되었습니다",
-          description: "빠른 시일 내에 답변 드리겠습니다.",
-          variant: "default"
-        });
+        showSuccess("문의가 접수되었습니다. 빠른 시일 내에 답변 드리겠습니다.");
 
         // 폼 초기화
         setFormData({
@@ -161,11 +141,7 @@ export function InquiryModal({ isOpen, onClose }: InquiryModalProps) {
       }
     } catch (error) {
       console.error('문의 전송 실패:', error);
-      toast({
-        title: "문의 전송 실패",
-        description: error instanceof Error ? error.message : "문의 전송 중 오류가 발생했습니다.",
-        variant: "destructive"
-      });
+      showError(error instanceof Error ? error.message : "문의 전송 중 오류가 발생했습니다.");
     } finally {
       setIsSubmitting(false);
     }

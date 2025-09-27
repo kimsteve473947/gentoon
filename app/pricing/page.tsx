@@ -7,6 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Check, ArrowRight, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PLAN_CONFIGS, PlanType, getPublicPlans } from '@/lib/subscription/plan-config';
 
 interface User {
   id: string;
@@ -36,61 +37,54 @@ export default function PricingPage() {
     getUser();
   }, []);
 
+  // 🎯 중앙집중식 플랜 설정 사용 (유료 플랜만)
   const plans = [
+    // STARTER 플랜
     {
-      name: "Free",
-      description: "서비스 체험용 - 실력 검증해보세요",
-      price: "₩0",
-      features: [
-        "무료체험용",
-        "AI 대본 생성 Demo",
-        "캐릭터 2개 등록",
-      ],
-      buttonText: "무료로 시작하기",
-      planId: "FREE",
+      name: PLAN_CONFIGS.STARTER.name,
+      description: "개인 창작자 추천",
+      price: `₩${PLAN_CONFIGS.STARTER.price.toLocaleString()}`,
+      priceUnit: "/월",
+      originalPrice: PLAN_CONFIGS.STARTER.price,
+      features: PLAN_CONFIGS.STARTER.features,
+      buttonText: `${PLAN_CONFIGS.STARTER.name} 시작하기`,
+      planId: "STARTER" as PlanType,
       recommended: false
     },
+    // PRO 플랜 (추천)
     {
-      name: "Pro",
-      description: "개인 창작자에게 추천",
-      price: "₩30,000",
+      name: PLAN_CONFIGS.PRO.name,
+      description: "개인 사업자 추천",
+      price: `₩${PLAN_CONFIGS.PRO.price.toLocaleString()}`,
       priceUnit: "/월",
-      originalPrice: 30000,
-      features: [
-        "인스타툰 30~40편 생성",
-        "AI 대본 생성 (대용량)",
-        "캐릭터 7개 등록",
-        "무제한 프로젝트",
-        "5GB 저장공간",
-        "워터마크 제거"
-      ],
-      buttonText: "Pro 시작하기",
-      planId: "PRO",
+      originalPrice: PLAN_CONFIGS.PRO.price,
+      features: PLAN_CONFIGS.PRO.features,
+      buttonText: `${PLAN_CONFIGS.PRO.name} 시작하기`,
+      planId: "PRO" as PlanType,
       recommended: true
     },
+    // PREMIUM 플랜
     {
-      name: "Premium",
-      description: "기업 및 팀에게 추천",
-      price: "₩100,000",
-      priceUnit: "/월", 
-      originalPrice: 100000,
-      features: [
-        "인스타툰 120편~160편 생성",
-        "AI 대본 생성 (초대용량)",
-        "캐릭터 15개 등록",
-        "무제한 프로젝트",
-        "20GB 저장공간",
-        "우선 지원"
-      ],
-      buttonText: "Premium 시작하기",
-      planId: "PREMIUM",
+      name: PLAN_CONFIGS.PREMIUM.name,
+      description: "기업 및 전문가 추천",
+      price: `₩${PLAN_CONFIGS.PREMIUM.price.toLocaleString()}`,
+      priceUnit: "/월",
+      originalPrice: PLAN_CONFIGS.PREMIUM.price,
+      features: PLAN_CONFIGS.PREMIUM.features,
+      buttonText: `${PLAN_CONFIGS.PREMIUM.name} 시작하기`,
+      planId: "PREMIUM" as PlanType,
       recommended: false
     }
   ];
 
   const handlePlanSelection = async (planId: string, originalPrice?: number) => {
     if (planId === "FREE") {
-      router.push('/studio');
+      if (!user) {
+        alert("무료 플랜을 사용하려면 먼저 로그인해주세요.");
+        router.push('/sign-in');
+        return;
+      }
+      router.push('/projects');
       return;
     }
 
@@ -103,6 +97,12 @@ export default function PricingPage() {
     setProcessingPlan(planId);
     
     try {
+      console.log('🔄 결제 요청 시작:', { 
+        planId, 
+        userEmail: user.email,
+        tossClientKey: process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ? 'present' : 'missing'
+      });
+      
       const response = await fetch('/api/payments/billing-register', {
         method: 'POST',
         headers: {
@@ -115,25 +115,73 @@ export default function PricingPage() {
         }),
       });
 
+      console.log('📡 API 응답 상태:', response.status);
+      console.log('📡 API 응답 헤더:', Object.fromEntries(response.headers.entries()));
+
+      // HTML 응답인지 확인
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('❌ 예상치 못한 응답 타입:', contentType);
+        const text = await response.text();
+        console.error('❌ 응답 내용:', text.substring(0, 200));
+        throw new Error('서버에서 올바르지 않은 응답을 반환했습니다');
+      }
+
       const data = await response.json();
+      console.log('📦 API 응답 데이터:', data);
 
       if (!response.ok) {
         throw new Error(data.error || '결제 요청에 실패했습니다');
       }
 
+      // API 응답 데이터 검증
+      if (!data || !data.billingAuthRequest) {
+        console.error('❌ API 응답에 billingAuthRequest가 없습니다:', data);
+        throw new Error('서버 응답이 올바르지 않습니다');
+      }
+
+      console.log('🎫 빌링키 등록 요청 데이터:', {
+        customerKey: data.billingAuthRequest.customerKey,
+        customerEmail: data.billingAuthRequest.customerEmail,
+        customerName: data.billingAuthRequest.customerName,
+      });
+
+      console.log('🔑 Toss Payments SDK 로딩 중...');
       const tossPayments = await loadTossPayments(
         process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!
       );
+      console.log('✅ Toss Payments SDK 로딩 완료');
 
-      await tossPayments.requestBillingAuth('카드', {
+      // 🎯 토스페이먼츠 공식 가이드에 따른 빌링키 등록
+      console.log('🔑 토스페이먼츠 빌링키 등록 시작 (공식 SDK 방식)');
+      
+      // 토스페이먼츠 호스팅 결제창을 통한 빌링키 등록
+      const billingResult = await tossPayments.requestBillingAuth('CARD', {
         customerKey: data.billingAuthRequest.customerKey,
         successUrl: data.billingAuthRequest.successUrl,
         failUrl: data.billingAuthRequest.failUrl,
+        customerEmail: data.billingAuthRequest.customerEmail,
+        customerName: data.billingAuthRequest.customerName,
       });
+      
+      console.log('✅ 빌링키 등록 결과:', billingResult);
+      
+      console.log('✅ requestBillingAuth 호출 완료 (리다이렉트 예정)');
 
     } catch (error) {
-      console.error('Payment initiation error:', error);
-      alert(error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다.");
+      console.error('💥 결제 요청 오류:', error);
+      
+      let errorMessage = "결제 처리 중 오류가 발생했습니다.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('JSON')) {
+          errorMessage = "서버 연결에 문제가 있습니다. 페이지를 새로고침 후 다시 시도해주세요.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setProcessingPlan(null);
     }
@@ -270,7 +318,7 @@ export default function PricingPage() {
               size="lg" 
               variant="secondary"
               className="bg-white text-purple-600 hover:bg-gray-100"
-              onClick={() => window.open('mailto:contact@gentoon.com', '_blank')}
+              onClick={() => window.open('mailto:support@gentoon.com', '_blank')}
             >
               기업 상담 문의하기
               <ArrowRight className="ml-2 h-4 w-4" />

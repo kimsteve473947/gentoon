@@ -59,8 +59,7 @@ import {
   Heart,
   ChevronDown,
   ArrowUpDown,
-  ChevronRight,
-  Package
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BUBBLE_TEMPLATES } from './BubbleTemplates';
@@ -279,6 +278,9 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   
+  // 오른쪽 패널 탭 상태
+  const [rightPanelTab, setRightPanelTab] = useState<'single' | 'batch'>('single');
+  
   // 정렬 상태 (2열 그리드 유지)
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name'>('newest');
   
@@ -293,6 +295,10 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [pendingScript, setPendingScript] = useState<ScriptPanel[]>([]);
+  
+  // AI 대본 상태 관리 (탭 이동시에도 유지)
+  const [aiGeneratedScript, setAiGeneratedScript] = useState<ScriptPanel[]>([]);
+  const [aiEditedScript, setAiEditedScript] = useState<ScriptPanel[]>([]);
   
   
   // 멀티 선택을 위한 상태
@@ -712,8 +718,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   };
   
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bubble' | 'text' | 'ai-character' | 'ai-script' | 'upload'>('bubble');
-  const [showAIScriptModal, setShowAIScriptModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'bubble' | 'text' | 'ai-character' | 'upload'>('bubble');
   const [bubbleText, setBubbleText] = useState('');
   const [textContent, setTextContent] = useState('');
   
@@ -723,16 +728,6 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   // 🔄 실시간 패널 상태 동기화를 위한 폴링
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
   
-  // AI 대본 생성 상태
-  const [storyPrompt, setStoryPrompt] = useState('');
-  const [selectedPanelCount, setSelectedPanelCount] = useState<'4-5' | '6-8' | '9-10'>('4-5');
-  const [scriptCharacters, setScriptCharacters] = useState<any[]>([]);
-  const [selectedScriptCharacters, setSelectedScriptCharacters] = useState<string[]>([]);
-  const [scriptElements, setScriptElements] = useState<any[]>([]);
-  const [selectedScriptElements, setSelectedScriptElements] = useState<string[]>([]);
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [generatedScript, setGeneratedScript] = useState<any[]>([]);
-  const [scriptCopiedIndex, setScriptCopiedIndex] = useState<number | null>(null);
   
   // AI 캐릭터 생성 관련 상태
   const [characterDescription, setCharacterDescription] = useState('');
@@ -899,12 +894,13 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
   
   // 캐릭터 상태
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  const [characters, setCharacters] = useState<any[]>([]); // 전체 캐릭터 정보
+  const [selectedElements, setSelectedElements] = useState<any[]>([]);
   
   // 🎭 패널별 캐릭터 매핑 상태 (AI 대본 기반)
   const [panelCharacterMap, setPanelCharacterMap] = useState<Map<number, string[]>>(new Map());
   
-  // ✨ 요소 상태 (새로 추가) - 이미지 기반
-  const [selectedElements, setSelectedElements] = useState<any[]>([]);
+  // ✨ 요소 상태는 위에서 이미 선언됨
   
   // 🎭 캐릭터 이름으로 ID 찾기 함수
   const findCharacterIdByName = useCallback((characterName: string, availableCharacters: any[]): string | null => {
@@ -1015,6 +1011,30 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     }
   }, [selectedCutId, panelCharacterMap, updateCharactersForCurrentPanel, cuts]);
   
+  // 🎭 캐릭터 데이터 로딩
+  useEffect(() => {
+    const loadCharacters = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: charactersData } = await supabase
+            .from('character')
+            .select('id, name, description, thumbnailUrl, squareRatioUrl, portraitRatioUrl')
+            .eq('userId', user.id);
+          
+          if (charactersData) {
+            setCharacters(charactersData);
+            console.log('🎭 캐릭터 데이터 로딩 완료:', charactersData.length, '개');
+          }
+        }
+      } catch (error) {
+        console.error('❌ 캐릭터 로딩 실패:', error);
+      }
+    };
+
+    loadCharacters();
+  }, [supabase]);
+
   // 디버깅용 로그
   useEffect(() => {
   }, [selectedCharacters]);
@@ -1079,17 +1099,11 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     loadCharactersAndMap();
 
     setHasUnsavedChanges(true);
-    setShowAIScriptModal(false);
   }, [updateHistory, mapPanelCharacters]);
 
   const [addCharacterModalOpen, setAddCharacterModalOpen] = useState(false);
   const [characterRefreshKey, setCharacterRefreshKey] = useState(0);
   
-  // AI 대본용 캐릭터 및 요소 로딩
-  useEffect(() => {
-    loadScriptCharacters();
-    loadScriptElements();
-  }, [characterRefreshKey]);
 
   // 업로드된 파일 목록 로딩
   useEffect(() => {
@@ -1120,55 +1134,6 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     }
   }, [uploadedImages, sortOrder]);
 
-  const loadScriptCharacters = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: userData } = await supabase
-        .from('user')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (!userData) return;
-
-      const { data: charactersData } = await supabase
-        .from('character')
-        .select('id, name, description, thumbnailUrl')
-        .eq('userId', userData.id)
-        .order('createdAt', { ascending: false });
-
-      setScriptCharacters(charactersData || []);
-    } catch (error) {
-      console.error('대본용 캐릭터 로딩 실패:', error);
-    }
-  };
-
-  const loadScriptElements = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: userData } = await supabase
-        .from('user')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (!userData) return;
-
-      const { data: elementsData } = await supabase
-        .from('element')
-        .select('id, name, description, category, thumbnailUrl')
-        .eq('userId', userData.id)
-        .order('createdAt', { ascending: false });
-
-      setScriptElements(elementsData || []);
-    } catch (error) {
-      console.error('대본용 요소 로딩 실패:', error);
-    }
-  };
   
   // 디바운스된 색상 업데이트를 위한 상태
   const [pendingColorUpdates, setPendingColorUpdates] = useState<{
@@ -2159,127 +2124,25 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     setCharacterRefreshKey(prev => prev + 1);
   };
 
-  // AI 대본 생성 함수들
-  const handleScriptCharacterToggle = (characterId: string) => {
-    setSelectedScriptCharacters(prev => 
-      prev.includes(characterId)
-        ? prev.filter(id => id !== characterId)
-        : [...prev, characterId]
-    );
-  };
-
-  const handleScriptElementToggle = (elementId: string) => {
-    setSelectedScriptElements(prev => 
-      prev.includes(elementId)
-        ? prev.filter(id => id !== elementId)
-        : [...prev, elementId]
-    );
-  };
-
-  const generateScript = async () => {
-    if (!storyPrompt.trim()) {
-      alert('스토리 아이디어를 입력해주세요');
-      return;
-    }
-
-    setIsGeneratingScript(true);
-    
-    try {
-      const characterNames = selectedScriptCharacters.map(id => {
-        const char = scriptCharacters.find(c => c.id === id);
-        return char?.name || '';
-      }).filter(Boolean);
-
-      const elementNames = selectedScriptElements.map(id => {
-        const element = scriptElements.find(e => e.id === id);
-        return element ? `${element.name} (${element.description})` : '';
-      }).filter(Boolean);
-
-      const panelCount = selectedPanelCount === '4-5' ? 4 : 
-                        selectedPanelCount === '6-8' ? 7 : 10;
-
-      const response = await fetch('/api/ai/generate-script', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          storyPrompt: storyPrompt.trim(),
-          characterNames,
-          elementNames,
-          panelCount,
-          style: 'webtoon'
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('❌ Script generation API error:', errorData);
-        
-        try {
-          const jsonError = JSON.parse(errorData);
-          throw new Error(jsonError.error || '대본 생성 실패');
-        } catch (parseError) {
-          throw new Error(`API 오류 (${response.status}): ${errorData.substring(0, 100)}...`);
-        }
-      }
-
-      const resultText = await response.text();
-      
-      let result;
-      try {
-        result = JSON.parse(resultText);
-      } catch (parseError) {
-        console.error('❌ JSON parse error:', parseError);
-        console.error('❌ Response text:', resultText);
-        throw new Error('서버 응답 형식이 올바르지 않습니다. HTML 페이지가 반환되었을 수 있습니다.');
-      }
-
-      if (result.success === false) {
-        throw new Error(result.error || '대본 생성 실패');
-      }
-
-      if (!result.panels || !Array.isArray(result.panels)) {
-        console.error('❌ Invalid response structure:', result);
-        throw new Error('대본 데이터가 올바르지 않습니다');
-      }
-
-      setGeneratedScript(result.panels);
-      
-    } catch (error) {
-      console.error('대본 생성 실패:', error);
-      alert(error instanceof Error ? error.message : '대본 생성 중 오류가 발생했습니다');
-    } finally {
-      setIsGeneratingScript(false);
-    }
-  };
-
-  const copyScriptPrompt = (prompt: string, index: number) => {
-    navigator.clipboard.writeText(prompt);
-    setScriptCopiedIndex(index);
-    setTimeout(() => setScriptCopiedIndex(null), 2000);
-  };
-
-  const useGeneratedScript = () => {
-    console.log('🎬 useGeneratedScript 호출됨, 대본 데이터:', generatedScript);
-    handleScriptGenerated(generatedScript);
-  };
 
   // AI 대본 적용 함수
   interface ScriptPanel {
     order: number;
     prompt: string;
-    characters: string[];
-    elements: string[];
+    characters: string[]; // AI 생성 캐릭터 이름들 (참고용)
+    elements: string[]; // AI 생성 요소 이름들 (참고용)
+    characterIds?: string[]; // 🚀 실제 DB 캐릭터 ID들
+    elementIds?: string[]; // 🚀 실제 DB 요소 ID들
   }
 
   // 패널에 적용하기 (기존 방식 + 캐릭터/요소 자동 선택)
   const handleApplyToCanvas = useCallback(async (panels: ScriptPanel[]) => {
     console.log('📋 패널에 적용하기:', panels);
+    console.log('🔍 현재 선택된 컷 ID:', selectedCutId);
     
     try {
-      // 먼저 대본을 캔버스에 적용
-      handleScriptGenerated(panels);
+      // 대본을 캔버스에 적용하지 않고 캐릭터/요소만 자동 선택
+      console.log('📋 패널 적용: 캐릭터/요소 자동 선택만 수행');
       
       // 현재 선택된 컷의 캐릭터와 요소를 자동 선택
       const currentCutIndex = parseInt(selectedCutId) - 1;
@@ -2373,94 +2236,471 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
 
   // 한꺼번에 생성하기 (배치 생성)
   const handleBatchGeneration = useCallback(async (panels: ScriptPanel[]) => {
-    console.log('🚀 배치 생성 시작:', panels);
+    console.log('🚀 배치 생성 시작 (개별 API 호출 방식):', panels);
+    console.log('📋 현재 상태:', {
+      selectedCharacters,
+      selectedElements: selectedElements.length,
+      canvasRatio,
+      projectId: projectId
+    });
+    
+    if (!panels || panels.length === 0) {
+      alert('생성할 패널이 없습니다.');
+      return;
+    }
     
     try {
       setIsBatchGenerating(true);
       setBatchProgress({ current: 0, total: panels.length });
       setPendingScript(panels);
 
-      // 먼저 대본을 캔버스에 적용
-      handleScriptGenerated(panels);
+      // 대본을 캔버스에 자동 적용하지 않음 - 사용자가 직접 선택하도록 변경
+      console.log('🚀 배치 생성: 기존 패널 유지, 자동 적용 비활성화');
 
-      // 배치 생성 API 호출
-      const response = await fetch('/api/ai/generate-batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          panels,
-          canvasRatio: canvasRatio,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '배치 생성 실패');
-      }
-
-      const result = await response.json();
+      // 필요한 패널 수만큼 패널이 있는지 확인하고 부족하면 추가
+      const neededPanels = panels.length;
+      const currentPanels = cuts.length;
       
-      if (result.success) {
-        console.log('🎉 배치 생성 완료:', result.generatedImages);
+      // 🧹 배치 생성용 작업 배열 생성 (state 비동기 업데이트 문제 해결)
+      let workingCuts = [...cuts];
+      
+      if (currentPanels < neededPanels) {
+        console.log(`📋 패널 부족: 필요 ${neededPanels}개, 현재 ${currentPanels}개 - ${neededPanels - currentPanels}개 추가`);
         
-        // 생성된 이미지들을 각 패널에 순차적으로 적용
-        for (let i = 0; i < result.generatedImages.length; i++) {
-          const imageData = result.generatedImages[i];
-          const cutId = String(imageData.order);
-          
-          setBatchProgress({ current: i + 1, total: panels.length });
-          
-          // 해당 컷에 배경 이미지로 추가
-          const newElement: CanvasElement = {
-            id: `bg-${Date.now()}-${i}`,
-            type: 'image',
-            x: 0,
-            y: 0,
-            width: canvasRatio === '1:1' ? 1024 : 896,
-            height: canvasRatio === '1:1' ? 1024 : 1115,
-            rotation: 0,
-            imageUrl: imageData.imageUrl,
-            zIndex: 0,
+        for (let i = currentPanels; i < neededPanels; i++) {
+          const newCut: Cut = {
+            id: String(Date.now() + i),
+            width: canvasRatio === '1:1' ? 400 : canvasRatio === '16:9' ? 600 : 320,
+            height: canvasRatio === '1:1' ? 400 : canvasRatio === '16:9' ? 337.5 : 400,
+            backgroundColor: '#ffffff',
+            elements: [],
+            imageUrl: null,
+            generationId: null,
+            aspectRatio: canvasRatio
           };
-
-          // 상태 업데이트
-          pushHistory(prev => {
-            const newCuts = prev.cuts.map(cut => {
-              if (cut.id === cutId) {
-                return {
-                  ...cut,
-                  elements: [newElement, ...cut.elements]
-                };
-              }
-              return cut;
-            });
-            
-            return {
-              ...prev,
-              cuts: newCuts
-            };
-          });
-
-          // 각 이미지 생성 간 짧은 딜레이
-          await new Promise(resolve => setTimeout(resolve, 500));
+          workingCuts.push(newCut);
         }
         
-        console.log('✅ 모든 이미지가 캔버스에 적용되었습니다');
-      } else {
-        throw new Error(result.error || '배치 생성 실패');
+        setCuts(workingCuts); // 비동기 state 업데이트
+        console.log(`✅ ${neededPanels - currentPanels}개 패널 추가 완료`);
       }
+
+      console.log('🔥 배치 생성: 개별 패널 생성 시작');
+      console.log('🗂️ 작업 배열:', workingCuts.map(c => ({ id: c.id, index: workingCuts.indexOf(c) })));
+      
+      // 🚀 나노바나나MCP 방식: 첫 패널 생성 → 연속 편집
+      let previousImageUrl: string | null = null;
+      
+      // 🎯 슬롯 추적 시스템: 각 패널에서 사용된 요소들 기록
+      let previousPanelSlots = {
+        characterIds: [] as string[],
+        elementIds: [] as string[]
+      };
+      
+      console.log('🎯 슬롯 추적 시스템 초기화');
+      
+      for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        
+        // 🔍 패널 ID 가져오기 (작업 배열에서 가져오기)
+        const cutId = workingCuts[i]?.id || String(Date.now() + i);
+        
+        console.log(`🔍 패널 ${i + 1} ID 확인:`, {
+          index: i,
+          cutId: cutId,
+          fromWorkingArray: !!workingCuts[i],
+          workingArrayLength: workingCuts.length
+        });
+        
+        console.log(`⚡ 배치 생성: ${i + 1}/${panels.length} 패널 생성 중...`);
+        console.log(`🎯 패널 ${i + 1} 세부 정보:`, {
+          패널순서: i + 1,
+          총패널수: panels.length,
+          패널ID: cutId,
+          프롬프트: panel.prompt?.substring(0, 100) + '...',
+          이전이미지URL: previousImageUrl ? previousImageUrl.substring(0, 50) + '...' : '없음',
+          편집모드: i > 0 ? '✅ nanobananaMCP' : '❌ 새로생성'
+        });
+        setBatchProgress({ current: i, total: panels.length });
+        
+        try {
+          // 🔥 로딩 상태 설정
+          setGeneratingCutIds(prev => new Set([...prev, cutId]));
+          
+          // 🎭 1단계: 현재 패널에 필요한 캐릭터 결정
+          const currentPanelCharacterIds = panel.characterIds?.length > 0 
+            ? panel.characterIds // AI 대본에서 매핑된 캐릭터
+            : selectedCharacters.slice(0, 2); // 매핑이 없으면 최대 2명
+          
+          // 🖼️ 2단계: 현재 패널에 필요한 요소 결정 (개선된 스마트 매핑)
+          let currentPanelElementIds: string[] = [];
+          
+          // 2-1. AI 대본에서 명시적으로 지정된 요소 우선 사용
+          if (panel.elements && panel.elements.length > 0) {
+            console.log(`🎯 패널 ${i + 1} AI 대본 요소 발견:`, panel.elements);
+            currentPanelElementIds = selectedElements
+              .filter(element => panel.elements!.includes(element.name))
+              .map(e => e.id);
+          }
+          
+          // 2-2. AI 대본 요소가 없으면 프롬프트 기반 스마트 매칭
+          if (currentPanelElementIds.length === 0) {
+            const prompt = panel.prompt.toLowerCase();
+            const smartMatchedElements = selectedElements.filter(element => {
+              const elementName = element.name.toLowerCase();
+              const elementDesc = element.description?.toLowerCase() || '';
+              
+              // 더 정확한 매칭 로직
+              const nameMatch = prompt.includes(elementName);
+              const descMatch = elementDesc && prompt.includes(elementDesc);
+              
+              // 키워드 기반 연관성 체크
+              const keywords = elementName.split(/\s+/);
+              const keywordMatch = keywords.some(keyword => 
+                keyword.length > 2 && prompt.includes(keyword)
+              );
+              
+              return nameMatch || descMatch || keywordMatch;
+            });
+            
+            currentPanelElementIds = smartMatchedElements.map(e => e.id);
+            console.log(`🔍 패널 ${i + 1} 프롬프트 매칭 요소:`, smartMatchedElements.map(e => e.name));
+          }
+          
+          // 2-3. 여전히 없으면 적절한 fallback 적용
+          if (currentPanelElementIds.length === 0) {
+            if (i === 0) {
+              // 첫 패널: 최대 2개만 (3개 제한 고려)
+              currentPanelElementIds = selectedElements.slice(0, 2).map(e => e.id);
+              console.log(`🎯 패널 1 fallback: 첫 2개 요소 사용`);
+            } else {
+              // 나머지 패널: 1개만 (이전 이미지 + 새요소 1개)
+              currentPanelElementIds = selectedElements.slice(0, 1).map(e => e.id);
+              console.log(`🎯 패널 ${i + 1} fallback: 첫 1개 요소 사용`);
+            }
+          }
+          
+          console.log(`🎯 패널 ${i + 1} 필요한 슬롯:`, {
+            현재_캐릭터: currentPanelCharacterIds,
+            현재_요소: currentPanelElementIds,
+            이전_캐릭터: previousPanelSlots.characterIds,
+            이전_요소: previousPanelSlots.elementIds
+          });
+          
+          // 🧠 3단계: 스마트 슬롯 최적화 (Gemini 3개 제한 준수)
+          let optimizedCharacterIds: string[] = [];
+          let optimizedElementIds: string[] = [];
+          
+          if (i === 0) {
+            // 첫 번째 패널: 최대 3개까지 자유롭게
+            optimizedCharacterIds = currentPanelCharacterIds.slice(0, 2);
+            optimizedElementIds = currentPanelElementIds.slice(0, 3 - optimizedCharacterIds.length);
+            
+            console.log(`🆕 패널 1 (신규): 캐릭터 ${optimizedCharacterIds.length}개 + 요소 ${optimizedElementIds.length}개 = 총 ${optimizedCharacterIds.length + optimizedElementIds.length}개`);
+          } else {
+            // 2패널부터: 이전 패널과 비교해서 새로운 것만 추가
+            const newCharacters = currentPanelCharacterIds.filter(id => !previousPanelSlots.characterIds.includes(id));
+            const newElements = currentPanelElementIds.filter(id => !previousPanelSlots.elementIds.includes(id));
+            
+            console.log(`🔍 패널 ${i + 1} 차이 분석:`, {
+              새로운_캐릭터: newCharacters,
+              새로운_요소: newElements,
+              사용가능_슬롯: 2 // 이전 이미지(1) + 새로운 것들(2) = 총 3개
+            });
+            
+            // 우선순위: 새로운 요소 > 새로운 캐릭터
+            const availableSlots = 2;
+            optimizedElementIds = newElements.slice(0, availableSlots);
+            const remainingSlots = availableSlots - optimizedElementIds.length;
+            optimizedCharacterIds = newCharacters.slice(0, remainingSlots);
+            
+            console.log(`🎯 패널 ${i + 1} 최적화 결과: 이전이미지(1) + 새요소(${optimizedElementIds.length}) + 새캐릭터(${optimizedCharacterIds.length}) = 총 ${1 + optimizedElementIds.length + optimizedCharacterIds.length}개`);
+          }
+          
+          // 요소 URL 변환
+          const optimizedElements = selectedElements.filter(e => optimizedElementIds.includes(e.id));
+          const elementImageUrls = getElementImageUrls(optimizedElements);
+          
+          console.log(`🖼️ 패널 ${i + 1} 최종 전송 데이터:`, {
+            캐릭터ID: optimizedCharacterIds,
+            요소ID: optimizedElementIds,
+            요소이름: optimizedElements.map(e => e.name),
+            전송될_이미지수: i === 0 ? optimizedCharacterIds.length + optimizedElementIds.length : 1 + optimizedCharacterIds.length + optimizedElementIds.length
+          });
+          
+          // ✨ 최적화된 요소들을 프롬프트에 통합
+          const enhancedPrompt = enhancePromptWithElements({
+            selectedElements: optimizedElements,
+            userPrompt: panel.prompt
+          });
+          
+          let response;
+          
+          if (i === 0) {
+            // 🎯 첫 번째 패널: 새로 생성 (nanobananaMCP 시작점)
+            const requestData = {
+              prompt: enhancedPrompt,
+              aspectRatio: canvasRatio,
+              style: 'webtoon',
+              characterIds: optimizedCharacterIds,
+              elementImageUrls: elementImageUrls,
+              projectId: projectId,
+              panelId: cutId
+            };
+            
+            console.log('🆕 nanobananaMCP 시작: 첫 번째 패널 - 새로 생성');
+            console.log('📤 첫 번째 패널 요청:', {
+              mode: 'new_generation',
+              cutId,
+              prompt: requestData.prompt?.substring(0, 100) + '...',
+              characterIds: optimizedCharacterIds.length,
+              elementUrls: elementImageUrls.length,
+              totalImages: optimizedCharacterIds.length + elementImageUrls.length
+            });
+            
+            response = await fetch('/api/ai/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestData),
+            });
+          } else {
+            // 🎯 두 번째 패널부터: nanobananaMCP edit 방식
+            if (!previousImageUrl) {
+              console.error(`❌ 패널 ${i + 1}: previousImageUrl이 없습니다! nanobananaMCP 실패`);
+              throw new Error(`패널 ${i + 1}: 이전 이미지가 없어 nanobananaMCP를 진행할 수 없습니다.`);
+            }
+            
+            const requestData = {
+              prompt: enhancedPrompt,
+              aspectRatio: canvasRatio,
+              style: 'webtoon',
+              characterIds: optimizedCharacterIds,
+              elementImageUrls: elementImageUrls,
+              projectId: projectId,
+              panelId: cutId,
+              referenceImage: previousImageUrl, // 🚀 nanobananaMCP 핵심: 이전 이미지 참조
+              editMode: true // 🚀 편집 모드 활성화
+            };
+            
+            console.log(`🍌 nanobananaMCP 편집: ${i + 1}번째 패널 (이전 이미지 기반)`);
+            console.log('📤 nanobananaMCP 편집 요청:', {
+              mode: 'editImageNanoBananaMCP',
+              cutId,
+              prompt: requestData.prompt?.substring(0, 100) + '...',
+              previousImage: previousImageUrl?.substring(0, 50) + '...',
+              characterIds: optimizedCharacterIds.length,
+              elementUrls: elementImageUrls.length,
+              totalImages: 1 + optimizedCharacterIds.length + elementImageUrls.length // 이전이미지 + 새로운것들
+            });
+            
+            response = await fetch('/api/ai/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestData),
+            });
+          }
+
+          if (!response.ok) {
+            let errorData;
+            let errorMessage = `HTTP ${response.status}`;
+            
+            try {
+              errorData = await response.json();
+              errorMessage = errorData?.error || errorData?.message || errorMessage;
+            } catch (parseError) {
+              console.warn('응답 JSON 파싱 실패:', parseError);
+              errorMessage = `HTTP ${response.status} - 응답 파싱 실패`;
+            }
+            
+            console.error('❌ 개별 패널 생성 실패:', {
+              status: response.status,
+              statusText: response.statusText,
+              errorData,
+              errorMessage
+            });
+            
+            // 🚨 토큰 부족 에러 처리 (402 Payment Required)
+            if (response.status === 402) {
+              console.log('💳 토큰 부족 감지 - 업그레이드 모달 표시');
+              setUpgradeModalOpen(true);
+              setGeneratingCutIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(cutId);
+                return newSet;
+              });
+              continue; // 다음 패널로 계속
+            }
+            
+            // 다른 에러 처리 또는 예외 발생
+            console.error(`❌ 패널 ${cutId} 생성 실패:`, errorMessage);
+            setGeneratingCutIds(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(cutId);
+              return newSet;
+            });
+            continue; // 다음 패널로 계속
+          }
+
+          const result = await response.json();
+          console.log(`🎉 개별 패널 ${cutId} 생성 완료:`, result);
+          
+          // 🔍 이미지 중복 방지를 위한 상세 검증
+          console.log(`🔍 패널 ${i + 1} 결과 검증:`, {
+            패널순서: i + 1,
+            패널ID: cutId,
+            성공여부: result.success,
+            이미지URL: result.data?.imageUrl ? result.data.imageUrl.substring(0, 80) + '...' : '❌ 없음',
+            생성ID: result.data?.generationId || '❌ 없음',
+            토큰사용: result.data?.tokensUsed || 0,
+            고유성체크: {
+              이전이미지와_다름: previousImageUrl ? result.data?.imageUrl !== previousImageUrl : '첫패널',
+              URL끝자리: result.data?.imageUrl ? result.data.imageUrl.slice(-20) : '없음'
+            }
+          });
+          
+          if (result.success && result.data?.imageUrl) {
+            // 🚀 작업 배열도 즉시 업데이트 (다음 패널을 위해)
+            workingCuts = workingCuts.map(c => 
+              c.id === cutId 
+                ? { 
+                    ...c, 
+                    imageUrl: result.data.imageUrl, 
+                    generationId: result.data.generationId
+                  }
+                : c
+            );
+            
+            // 🚀 히스토리 상태도 업데이트 (UI 동기화)
+            pushHistory(prev => ({
+              ...prev,
+              cuts: workingCuts // 작업 배열을 그대로 사용
+            }));
+            
+            console.log(`✅ 패널 ${cutId} 이미지 업데이트 완료:`, {
+              cutId,
+              imageUrl: result.data.imageUrl.substring(0, 50) + '...',
+              generationId: result.data.generationId,
+              workingArrayUpdated: true
+            });
+            
+            // 변경사항 있음 표시
+            setHasUnsavedChanges(true);
+            
+            // 🚀 나노바나나MCP: 다음 패널을 위해 현재 이미지를 즉시 설정 (state 업데이트 기다리지 않고)
+            previousImageUrl = result.data.imageUrl;
+            console.log(`🔗 패널 ${i + 1} → ${i + 2} 연결 (즉시): ${previousImageUrl.substring(0, 50)}...`);
+            
+            // 🎯 슬롯 추적 업데이트: 현재 패널에서 사용된 모든 요소 기록
+            previousPanelSlots = {
+              characterIds: currentPanelCharacterIds, // 현재 패널에 필요했던 모든 캐릭터
+              elementIds: currentPanelElementIds // 현재 패널에 필요했던 모든 요소
+            };
+            
+            console.log(`🎯 패널 ${i + 1} 슬롯 업데이트:`, {
+              다음패널용_캐릭터슬롯: previousPanelSlots.characterIds,
+              다음패널용_요소슬롯: previousPanelSlots.elementIds,
+              이전이미지: previousImageUrl ? '✅ 설정됨' : '❌ 없음'
+            });
+            
+            // 🗾️ 데이터베이스 업데이트 (개발/프로덕션 모두)
+            if (projectId && isValidUUID(projectId)) {
+              try {
+                // 현재 패널의 실제 order 값 찾기 (작업 배열에서)
+                const currentCut = workingCuts.find(c => c.id === cutId);
+                const panelOrder = currentCut ? workingCuts.indexOf(currentCut) + 1 : i + 1;
+                
+                console.log(`🔍 패널 ${cutId} 업데이트 시도:`, { 
+                  projectId, 
+                  cutId,
+                  panelOrder,
+                  realOrder: workingCuts.findIndex(c => c.id === cutId) + 1,
+                  imageUrl: result.data.imageUrl?.substring(0, 50) + '...',
+                  workingCutsLength: workingCuts.length
+                });
+                
+                // 🔄 UPSERT 방식으로 패널 생성/업데이트 (중복 키 오류 방지)
+                const { data: upsertResult, error: upsertError } = await supabase
+                  .from('panel')
+                  .upsert({
+                    projectId: projectId,
+                    order: panelOrder,
+                    prompt: panel.prompt || '', // 현재 패널의 프롬프트 사용
+                    imageUrl: result.data.imageUrl,
+                    updatedAt: new Date().toISOString()
+                  }, {
+                    onConflict: 'projectId,order',
+                    ignoreDuplicates: false
+                  })
+                  .select('id, projectId, "order", imageUrl');
+                
+                if (upsertError) {
+                  console.error(`❌ 패널 ${cutId} UPSERT 실패:`, {
+                    error: upsertError,
+                    message: upsertError.message,
+                    code: upsertError.code,
+                    details: upsertError.details,
+                    projectId,
+                    panelOrder
+                  });
+                } else {
+                  console.log(`✅ 패널 ${cutId} UPSERT 성공:`, upsertResult?.[0]);
+                }
+              } catch (dbError) {
+                console.error(`❌ 패널 ${cutId} DB 오류:`, dbError);
+              }
+            }
+          } else {
+            console.error(`❌ 패널 ${cutId} 생성 실패 - 지원되지 않는 응답 형식`);
+          }
+          
+          // 🔥 로딩 상태 해제
+          setGeneratingCutIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(cutId);
+            return newSet;
+          });
+          
+          // 배치 진행률 업데이트
+          setBatchProgress({ current: i + 1, total: panels.length });
+          
+        } catch (panelError) {
+          console.error(`❌ 패널 ${cutId} 생성 오류:`, panelError);
+          
+          // 로딩 상태 해제
+          setGeneratingCutIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(cutId);
+            return newSet;
+          });
+          
+          // 다음 패널로 계속
+          continue;
+        }
+        
+        // 각 패널 간 짧은 대기 (API 레이트 리미트 방지)
+        if (i < panels.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      console.log('✅ 배치 생성 완료!');
       
     } catch (error) {
       console.error('❌ 배치 생성 오류:', error);
       alert(error instanceof Error ? error.message : '배치 생성 중 오류가 발생했습니다');
     } finally {
+      // 모든 로딩 상태 해제
+      setGeneratingCutIds(new Set());
       setIsBatchGenerating(false);
       setBatchProgress({ current: 0, total: 0 });
       setPendingScript([]);
+      setHasUnsavedChanges(true); // 변경사항 있음 표시
     }
-  }, [canvasRatio, pushHistory, handleScriptGenerated]);
+  }, [canvasRatio, pushHistory, handleScriptGenerated, selectedCharacters, selectedElements, projectId]);
 
 
   // AI 이미지 생성 함수
@@ -2575,7 +2815,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
               updatedAt: new Date().toISOString()
             })
             .eq('projectId', projectId)
-            .eq('order', parseInt(cutId));
+            .eq('"order"', parseInt(cutId));
 
           if (updateError) {
             console.error('❌ DB 업데이트 실패:', {
@@ -2694,31 +2934,53 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       // 1️⃣ 먼저 데이터베이스에 즉시 저장 (프로젝트별 격리)
       if (projectId && isValidUUID(projectId)) {
         try {
-          const { error: updateError } = await supabase
+          // 업데이트 데이터 준비 및 검증
+          const parsedOrder = parseInt(cutId);
+          const updateData = {
+            imageUrl: result.data?.imageUrl,
+            generationId: result.data?.generationId,
+            updatedAt: new Date().toISOString()
+          };
+          
+          console.log('🔍 Panel 업데이트 시도:', {
+            projectId,
+            cutId,
+            parsedOrder,
+            isValidOrder: !isNaN(parsedOrder),
+            hasImageUrl: !!updateData.imageUrl,
+            hasGenerationId: !!updateData.generationId
+          });
+
+          const { data: updatedData, error: updateError } = await supabase
             .from('panel')
-            .update({
-              imageUrl: result.data?.imageUrl,
-              generationId: result.data?.generationId,
-              updatedAt: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('projectId', projectId)
-            .eq('order', parseInt(cutId));
+            .eq('"order"', parsedOrder)
+            .select('id, order, projectId, imageUrl');
 
           if (updateError) {
             console.error('❌ DB 수정 실패:', {
-              error: updateError,
+              updateError,
+              message: updateError.message,
+              code: updateError.code,
+              details: updateError.details,
+              hint: updateError.hint,
               projectId,
               cutId,
-              parsedCutId: parseInt(cutId),
-              imageUrl: result.data?.imageUrl?.substring(0, 50) + '...',
-              generationId: result.data?.generationId
+              parsedOrder
             });
           } else {
-            console.log('✅ DB 수정 저장 성공:', {
+            const rowCount = updatedData?.length || 0;
+            console.log('✅ DB 수정 성공:', {
               cutId,
               projectId,
-              imageUrl: result.data?.imageUrl?.substring(0, 50) + '...'
+              updatedRowCount: rowCount,
+              updatedData: updatedData?.[0]
             });
+            
+            if (rowCount === 0) {
+              console.warn('⚠️ 경고: 업데이트 성공했지만 영향받은 행이 없음 (패널이 존재하지 않을 수 있음)');
+            }
           }
         } catch (dbError) {
           console.error('❌ DB 수정 저장 오류:', dbError);
@@ -4142,7 +4404,6 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
     { id: 'bubble', label: '말풍선', icon: MessageSquare },
     { id: 'text', label: '텍스트', icon: Type },
     { id: 'ai-character', label: 'AI 캐릭터', icon: UserPlus },
-    { id: 'ai-script', label: 'AI 대본', icon: FileText },
     { id: 'upload', label: '업로드', icon: Upload }
   ];
 
@@ -5008,278 +5269,6 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                 </div>
               )}
 
-              {activeTab === 'ai-script' && (
-                <div className="space-y-5">
-                  {/* 스토리 프롬프트 입력 */}
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-purple-600" />
-                      스토리 아이디어 
-                      <span className="text-red-500 text-xs">*</span>
-                    </label>
-                    <div className="relative">
-                      <Textarea
-                        value={storyPrompt}
-                        onChange={(e) => setStoryPrompt(e.target.value)}
-                        placeholder="예: 카페에서 우연히 만난 두 사람의 달콤한 만남..."
-                        className="resize-none h-24 text-sm border-slate-300 focus:border-purple-400 focus:ring-purple-400/20 rounded-lg shadow-sm"
-                        disabled={isGeneratingScript}
-                      />
-                      <div className="absolute bottom-2 right-2 text-xs text-slate-400">
-                        {storyPrompt.length}/200
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 컷 수 선택 */}
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                      <Square className="h-4 w-4 text-purple-600" />
-                      컷 수 선택
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { value: '4-5' as const, label: '4-5' },
-                        { value: '6-8' as const, label: '6-8' },
-                        { value: '9-10' as const, label: '9-10' }
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          className={cn(
-                            "p-3 border-2 rounded-lg text-center transition-all hover:shadow-sm",
-                            selectedPanelCount === option.value
-                              ? "border-purple-400 bg-gradient-to-br from-purple-50 to-pink-50 shadow-sm"
-                              : "border-slate-200 hover:border-slate-300 bg-white"
-                          )}
-                          onClick={() => setSelectedPanelCount(option.value)}
-                          disabled={isGeneratingScript}
-                        >
-                          <div className="text-sm font-semibold text-slate-800">{option.label}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 캐릭터 선택 */}
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                      <UserPlus className="h-4 w-4 text-purple-600" />
-                      등장 캐릭터 
-                      <span className="text-xs text-slate-500 font-normal">(선택사항)</span>
-                    </label>
-                    {scriptCharacters.length === 0 ? (
-                      <div className="text-center py-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
-                        <div className="w-12 h-12 bg-slate-200 rounded-full mx-auto mb-3 flex items-center justify-center">
-                          <User className="h-6 w-6 text-slate-400" />
-                        </div>
-                        <p className="text-sm text-slate-500 font-medium">등록된 캐릭터가 없습니다</p>
-                        <p className="text-xs text-slate-400 mt-1">먼저 캐릭터를 추가해보세요</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
-                        {scriptCharacters.map((character) => (
-                          <div
-                            key={character.id}
-                            className={cn(
-                              "flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:shadow-sm",
-                              selectedScriptCharacters.includes(character.id)
-                                ? "border-purple-400 bg-gradient-to-r from-purple-50 to-pink-50 shadow-sm"
-                                : "border-slate-200 hover:border-slate-300 bg-white"
-                            )}
-                            onClick={() => handleScriptCharacterToggle(character.id)}
-                          >
-                            {/* 캐릭터 아바타 */}
-                            <div className="relative flex-shrink-0">
-                              {character.thumbnailUrl ? (
-                                <img
-                                  src={character.thumbnailUrl}
-                                  alt={character.name}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                                  {character.name.charAt(0)}
-                                </div>
-                              )}
-                              {selectedScriptCharacters.includes(character.id) && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
-                                  <Check className="h-3 w-3 text-white" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 캐릭터 정보 */}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-slate-800 truncate">
-                                {character.name}
-                              </div>
-                              <div className="text-xs text-slate-500 truncate leading-relaxed">
-                                {character.description || '설명이 없습니다'}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 등장 요소 선택 */}
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                      <Package className="h-4 w-4 text-green-600" />
-                      등장 요소 
-                      <span className="text-xs text-slate-500 font-normal">(선택사항)</span>
-                    </label>
-                    {scriptElements.length === 0 ? (
-                      <div className="text-center py-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
-                        <div className="w-12 h-12 bg-slate-200 rounded-full mx-auto mb-3 flex items-center justify-center">
-                          <Package className="h-6 w-6 text-slate-400" />
-                        </div>
-                        <p className="text-sm text-slate-500 font-medium">등록된 요소가 없습니다</p>
-                        <p className="text-xs text-slate-400 mt-1">먼저 요소를 추가해보세요</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
-                        {scriptElements.map((element) => (
-                          <div
-                            key={element.id}
-                            className={cn(
-                              "flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:shadow-sm",
-                              selectedScriptElements.includes(element.id)
-                                ? "border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 shadow-sm"
-                                : "border-slate-200 hover:border-slate-300 bg-white"
-                            )}
-                            onClick={() => handleScriptElementToggle(element.id)}
-                          >
-                            {/* 요소 아바타 */}
-                            <div className="relative flex-shrink-0">
-                              {element.thumbnailUrl ? (
-                                <img
-                                  src={element.thumbnailUrl}
-                                  alt={element.name}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                                  {element.name.charAt(0)}
-                                </div>
-                              )}
-                              {selectedScriptElements.includes(element.id) && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
-                                  <Check className="h-3 w-3 text-white" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 요소 정보 */}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-slate-800 truncate">
-                                {element.name}
-                              </div>
-                              <div className="text-xs text-slate-500 truncate leading-relaxed">
-                                {element.description || '설명이 없습니다'}
-                              </div>
-                              {element.category && (
-                                <div className="text-xs text-green-600 font-medium">
-                                  {element.category}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 생성 버튼 */}
-                  <Button
-                    onClick={generateScript}
-                    disabled={!storyPrompt.trim() || isGeneratingScript}
-                    className="w-full h-12 bg-gradient-to-r from-purple-600 via-purple-600 to-pink-600 hover:from-purple-700 hover:via-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-200 text-white font-semibold"
-                    size="lg"
-                  >
-                    {isGeneratingScript ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        대본 생성 중...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-5 w-5 mr-2" />
-                        AI 대본 생성하기
-                      </>
-                    )}
-                  </Button>
-
-                  {/* 생성된 대본 결과 */}
-                  {generatedScript.length > 0 && (
-                    <div className="space-y-4 border-t-2 border-slate-200 pt-5">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-green-600" />
-                          생성된 대본 ({generatedScript.length}개 컷)
-                        </h4>
-                        <Button
-                          onClick={useGeneratedScript}
-                          size="sm"
-                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-md hover:shadow-lg transition-all"
-                        >
-                          <Zap className="h-4 w-4 mr-1" />
-                          웹툰에 적용
-                        </Button>
-                      </div>
-                      
-                      <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar">
-                        {generatedScript.map((panel, index) => (
-                          <div
-                            key={index}
-                            className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-                                  {index + 1}컷
-                                </div>
-                                {panel.characters && panel.characters.length > 0 && (
-                                  <div className="text-xs text-slate-500">
-                                    👤 {panel.characters.length}명
-                                  </div>
-                                )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-white/50 rounded-full"
-                                onClick={() => copyScriptPrompt(panel.prompt, index)}
-                              >
-                                {scriptCopiedIndex === index ? (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Copy className="h-4 w-4 text-slate-600" />
-                                )}
-                              </Button>
-                            </div>
-                            
-                            <p className="text-slate-700 leading-relaxed text-sm mb-3 font-medium">
-                              {panel.prompt}
-                            </p>
-                            
-                            {panel.characters && panel.characters.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {panel.characters.map((charName: string, charIndex: number) => (
-                                  <span key={charIndex} className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
-                                    {charName}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {activeTab === 'ai-character' && (
                 <div className="space-y-4">
@@ -5541,7 +5530,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                                     imageName: image.name
                                   });
                                 }}
-                                className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center hover:bg-red-600 hover:scale-110 shadow-lg"
+                                className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-all duration-200 flex items-center justify-center hover:bg-red-600 hover:scale-110 shadow-lg"
                                 title={`"${image.name}" 삭제`}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -6875,37 +6864,71 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
         {/* 오른쪽 속성 패널 - 독립 스크롤 */}
         <aside className="w-80 bg-white border-l border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex-shrink-0">
-            <h3 className="font-semibold text-slate-900">웹툰 이미지 생성하기</h3>
-            {selectedCut && (
-              <p className="text-sm text-slate-500 mt-1">
-                {selectedCutIndex + 1}컷 편집 중
-              </p>
+            {/* 탭 헤더 */}
+            <div className="flex space-x-1 mb-4">
+              <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  rightPanelTab === 'single'
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setRightPanelTab('single')}
+              >
+                한컷씩 생성하기
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  rightPanelTab === 'batch'
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setRightPanelTab('batch')}
+              >
+                여러컷 생성하기
+              </button>
+            </div>
+            
+            {/* 탭별 제목 */}
+            {rightPanelTab === 'single' && (
+              <>
+                <h3 className="font-semibold text-slate-900">한컷씩 생성하기</h3>
+                {selectedCut && (
+                  <p className="text-sm text-slate-500 mt-1">
+                    {selectedCutIndex + 1}컷 편집 중
+                  </p>
+                )}
+              </>
+            )}
+            {rightPanelTab === 'batch' && (
+              <h3 className="font-semibold text-slate-900">여러컷 생성하기</h3>
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {/* 캐릭터 & 요소 섹션 - 항상 표시 */}
-            <div className="space-y-4 pb-6 mb-6 border-b border-slate-200">
-              <CharacterAndElementSelector
-                selectedCharacters={selectedCharacters}
-                onCharacterToggle={handleCharacterToggle}
-                onAddCharacter={handleAddCharacter}
-                refreshKey={characterRefreshKey}
-                isGeneratingCharacter={isGeneratingCharacter}
-                generatingCharacterInfo={isGeneratingCharacter ? {
-                  name: characterName,
-                  description: characterDescription
-                } : undefined}
-                // 🎭 AI 대본 기반 자동 선택 정보
-                currentPanelIndex={selectedCutIndex}
-                panelCharacterMap={panelCharacterMap}
-                isAutoSelected={panelCharacterMap.has(selectedCutIndex)}
-                // ✨ 요소 관련 props (새로 추가)
-                selectedElements={selectedElements}
-                onElementsChange={handleElementsChange}
-              />
-            </div>
+            {rightPanelTab === 'single' && (
+              <>
+                {/* 캐릭터 & 요소 섹션 - 항상 표시 */}
+                <div className="space-y-4 pb-6 mb-6 border-b border-slate-200">
+                  <CharacterAndElementSelector
+                    selectedCharacters={selectedCharacters}
+                    onCharacterToggle={handleCharacterToggle}
+                    onAddCharacter={handleAddCharacter}
+                    refreshKey={characterRefreshKey}
+                    isGeneratingCharacter={isGeneratingCharacter}
+                    generatingCharacterInfo={isGeneratingCharacter ? {
+                      name: characterName,
+                      description: characterDescription
+                    } : undefined}
+                    // 🎭 AI 대본 기반 자동 선택 정보
+                    currentPanelIndex={selectedCutIndex}
+                    panelCharacterMap={panelCharacterMap}
+                    isAutoSelected={panelCharacterMap.has(selectedCutIndex)}
+                    // ✨ 요소 관련 props (새로 추가)
+                    selectedElements={selectedElements}
+                    onElementsChange={handleElementsChange}
+                  />
+                </div>
 
-            {selectedCut ? (
+                {selectedCut && (
               <div className="space-y-4">
 
                 <div>
@@ -7054,7 +7077,7 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                 )}
 
                 {/* 선택된 텍스트 요소 속성만 표시 (AI 생성 탭이 아닐 때만) */}
-                {selectedElement && selectedElement.type === 'text' && selectedElementIds.length <= 1 && activeTab !== 'ai-character' && activeTab !== 'ai-script' && (
+                {selectedElement && selectedElement.type === 'text' && selectedElementIds.length <= 1 && activeTab !== 'ai-character' && (
                   <div className="pt-4 border-t border-slate-200 space-y-3">
                     <h4 className="text-sm font-medium text-slate-700">
                       텍스트 속성
@@ -7151,19 +7174,44 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
                 )}
 
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="text-slate-400 mb-4">
-                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
-                    <Square className="h-8 w-8" />
-                  </div>
-                  <h4 className="text-sm font-medium text-slate-600 mb-2">패널을 선택하세요</h4>
-                  <p className="text-xs text-slate-500">
-                    왼쪽 캔버스에서 패널을 클릭하면<br />
-                    AI 프롬프트와 이미지 생성 기능을 사용할 수 있습니다
-                  </p>
+                )}
+              </>
+            )}
+            
+            {rightPanelTab === 'batch' && (
+              <>
+                {/* 캐릭터 & 요소 섹션 - 여러컷 생성에서도 표시 */}
+                <div className="space-y-4 pb-6 mb-6 border-b border-slate-200">
+                  <CharacterAndElementSelector
+                    selectedCharacters={selectedCharacters}
+                    onCharacterToggle={handleCharacterToggle}
+                    onAddCharacter={handleAddCharacter}
+                    refreshKey={characterRefreshKey}
+                    isGeneratingCharacter={isGeneratingCharacter}
+                    generatingCharacterInfo={isGeneratingCharacter ? {
+                      name: characterName,
+                      description: characterDescription
+                    } : undefined}
+                    // ✨ 요소 관련 props
+                    selectedElements={selectedElements}
+                    onElementsChange={handleElementsChange}
+                  />
                 </div>
-              </div>
+                
+                {/* AI 대본 생성기 */}
+                <AIScriptGenerator 
+                  onScriptGenerated={handleBatchGeneration}
+                  onApplyToCanvas={handleApplyToCanvas}
+                  className="border-0 shadow-none p-0 bg-transparent"
+                  generatedScript={aiGeneratedScript}
+                  setGeneratedScript={setAiGeneratedScript}
+                  editedScript={aiEditedScript}
+                  setEditedScript={setAiEditedScript}
+                  // 🚀 선택된 캐릭터와 요소 ID 전달
+                  selectedCharacterIds={selectedCharacters}
+                  selectedElementIds={selectedElements.map(el => el.id)}
+                />
+              </>
             )}
           </div>
         </aside>
@@ -7173,54 +7221,30 @@ export function MiriCanvasStudioUltimate({ projectId, initialData, onSave }: Mir
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>이미지 수정하기</DialogTitle>
-            <DialogDescription>
-              기존 이미지를 참조하여 수정할 내용을 입력하세요. 구체적으로 어떤 부분을 어떻게 바꿀지 설명해주세요.
-            </DialogDescription>
+            <DialogTitle>이미지 수정</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label htmlFor="edit-prompt" className="text-sm font-medium">
-                수정 사항
-              </label>
-              <Textarea
-                id="edit-prompt"
-                placeholder="예: 캐릭터의 표정을 웃는 얼굴로 바꿔주세요, 배경을 밤 풍경으로 변경해주세요, 캐릭터의 옷 색깔을 파란색으로 바꿔주세요..."
-                value={editPrompt}
-                onChange={(e) => setEditPrompt(e.target.value)}
-                className="mt-1 min-h-[120px]"
-              />
-            </div>
+            {selectedCut && selectedCut.imageUrl && (
+              <div className="relative">
+                <img
+                  src={selectedCut.imageUrl}
+                  alt="수정할 이미지"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setEditModalOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setEditModalOpen(false)}>
                 취소
               </Button>
-              <Button 
-                onClick={handleEditSubmit}
-                disabled={!editPrompt.trim()}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              >
-                <Edit3 className="h-4 w-4 mr-2" />
-                수정하기
+              <Button onClick={() => setEditModalOpen(false)}>
+                확인
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* AI 대본 생성기 모달 */}
-      <Dialog open={showAIScriptModal} onOpenChange={setShowAIScriptModal}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <AIScriptGenerator 
-            onScriptGenerated={handleBatchGeneration}
-            onApplyToCanvas={handleApplyToCanvas}
-            className="border-0 shadow-none"
-          />
-        </DialogContent>
-      </Dialog>
 
       {/* 캐릭터 추가 모달 */}
       <AddCharacterModal

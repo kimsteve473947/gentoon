@@ -369,15 +369,15 @@ ${enhancedPrompt}
     selectedCharacters.forEach(character => {
       characterDescriptions += this.buildCharacterDescriptionForAI(character) + "\n\n";
       
-      // ⭐ 핵심: 프로젝트 비율에 맞는 레퍼런스 이미지 선택 (캐릭터당 1개만)
+      // ⭐ 캐릭터당 1개 이미지만 사용 (Vertex AI 3개 제한 고려)
       const ratioSpecificImages = this.selectRatioSpecificImages(character, projectRatio);
-      referenceImages.push(...ratioSpecificImages.slice(0, 1)); // 캐릭터당 최대 1개
+      referenceImages.push(...ratioSpecificImages.slice(0, 1)); // 캐릭터당 1개
     });
     
-    // ⚠️ 전체 레퍼런스 이미지를 최대 3개로 제한 (Vertex AI 토큰 한도 고려)
+    // ⚠️ Vertex AI 멀티모달 최대 제한: 3개 이미지
     const limitedImages = referenceImages.slice(0, 3);
     if (referenceImages.length > 3) {
-      console.warn(`⚠️ 레퍼런스 이미지가 ${referenceImages.length}개에서 3개로 제한됨 (토큰 절약)`);
+      console.warn(`⚠️ 레퍼런스 이미지가 ${referenceImages.length}개에서 3개로 제한됨 (Vertex AI 멀티모달 제한)`);
     }
     
     // 향상된 프롬프트 생성
@@ -429,10 +429,10 @@ ${characterDescriptions}
         }
         // 기존 구조인지 확인 (string[]) - 첫 번째 이미지만 사용
         else if (Array.isArray(ratioSpecificData) && ratioSpecificData.length > 0) {
-          console.log(`🎯 캐릭터 ${character.name}: ${ratioKey} 비율 이미지 1개만 사용 (기존 구조에서 첫 번째)`);
-          return [ratioSpecificData[0]]; // ⭐ 수정: 첫 번째 이미지 1개만
+          console.log(`🎯 캐릭터 ${character.name}: ${ratioKey} 비율 이미지 1개 사용 (기존 구조)`);
+          return [ratioSpecificData[0]]; // 첫 번째 이미지만
         } else {
-          console.warn(`⚠️ 캐릭터 ${character.name}: ${ratioKey} 비율 이미지 구조가 잘못되어 원본 이미지 첫 번째 사용`);
+          console.warn(`⚠️ 캐릭터 ${character.name}: ${ratioKey} 비율 이미지 구조가 잘못되어 원본 이미지 사용`);
         }
       } else {
         console.warn(`⚠️ 캐릭터 ${character.name}: ${ratioKey} 비율 이미지가 없어서 원본 이미지 첫 번째 사용`);
@@ -440,8 +440,8 @@ ${characterDescriptions}
     }
     
     // ratioImages가 없거나 비율이 지정되지 않았다면 원본 이미지 첫 번째만 사용
-    console.log(`📷 캐릭터 ${character.name}: 원본 이미지 첫 번째 1개만 사용`);
-    return character.referenceImages.length > 0 ? [character.referenceImages[0]] : []; // ⭐ 수정: 첫 번째 이미지 1개만
+    console.log(`📷 캐릭터 ${character.name}: 원본 이미지 첫 번째 1개 사용`);
+    return character.referenceImages.length > 0 ? [character.referenceImages[0]] : []; // 첫 번째 이미지만
   }
 
   /**

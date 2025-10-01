@@ -41,6 +41,7 @@ export async function sendInquiryResponse({
       hasApiKey: !!process.env.RESEND_API_KEY,
       apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 10) + '...'
     });
+    
     const { data, error } = await resend.emails.send({
       from: 'GenToon 고객지원 <service@gentoon.ai>',
       to: [userEmail],

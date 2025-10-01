@@ -42,7 +42,7 @@ export function InquiryWidget() {
         }
         setUser(currentUser);
         
-        // 사용자가 로그인되어 있으면 이메일 자동 입력
+        // 사용자가 로그인되어 있으면 이메일 자동 입력 (수정 불가)
         if (currentUser?.email) {
           setFormData(prev => ({ ...prev, email: currentUser.email }));
         }
@@ -436,11 +436,14 @@ export function InquiryWidget() {
                     <Input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      placeholder="이메일을 입력하세요"
+                      readOnly
+                      placeholder="로그인된 계정 이메일"
                       required
-                      className="w-full"
+                      className="w-full bg-gray-100 text-gray-600 cursor-not-allowed"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      📧 로그인된 계정의 이메일로 답변을 받으실 수 있습니다
+                    </p>
                   </div>
 
                   {/* 문의 내용 */}

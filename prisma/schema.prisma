@@ -29,6 +29,7 @@ model User {
   generations       Generation[]
   transactions      Transaction[]
   refunds           Refund[]         // 환불 내역
+  projectContexts   ProjectContext[] // 프로젝트 컨텍스트
   cashReceipts      CashReceipt[]    // 현금영수증 내역
   cashReceiptSettings UserCashReceiptSettings? // 현금영수증 설정
   referralCode      String         @unique @default(uuid())
@@ -42,6 +43,9 @@ model User {
   
   // 🚀 고객 지원
   inquiries         Inquiry[]
+  
+  // 🚀 배치 생성
+  batchJobs         BatchGenerationJob[]
   
   @@index([id])
   @@index([email])
@@ -209,6 +213,8 @@ model Project {
   panels            Panel[]
   generations       Generation[]
   characters        ProjectCharacter[]
+  batchJobs         BatchGenerationJob[]
+  projectContexts   ProjectContext[]
   
   // 🚀 최적화된 인덱스
   @@index([userId, hasContent, lastEditedAt])  // 프로젝트 리스트 조회용
@@ -261,6 +267,7 @@ model Panel {
   
   // 관계
   generation        Generation?
+  batchResults      BatchPanelResult[]
   
   @@unique([projectId, order])
   @@index([projectId])
@@ -297,6 +304,9 @@ model Generation {
   metadata          Json?
   
   createdAt         DateTime       @default(now())
+  
+  // 관계
+  batchResults      BatchPanelResult[]
   
   @@index([userId])
   @@index([projectId])
@@ -450,7 +460,6 @@ model Inquiry {
   respondedAt       DateTime?      @map("responded_at")
   
   // 추가 정보
-  userPhone         String?        @map("user_phone") // 사용자가 입력한 전화번호
   userEmail         String?        @map("user_email") // 사용자가 입력한 연락처
   userAgent         String?        @map("user_agent") // 브라우저 정보
   ipAddress         String?        @map("ip_address")
@@ -914,4 +923,151 @@ model UserCashReceiptSettings {
   @@index([autoIssue])
   @@index([isActive])
   @@map("user_cash_receipt_settings")
+}
+
+// 배치 생성 작업 모델
+model BatchGenerationJob {
+  id                    String                 @id @default(uuid())
+  
+  // 연관 관계
+  userId                String                 @map("user_id")
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projectId             String                 @map("project_id")
+  project               Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // 작업 상태
+  status                BatchJobStatus         @default(PENDING)
+  
+  // 진행 상황
+  totalPanels           Int                    @map("total_panels")
+  completedPanels       Int                    @default(0) @map("completed_panels")
+  currentPanelIndex     Int?                   @map("current_panel_index")
+  
+  // 설정
+  canvasRatio           String                 @map("canvas_ratio") // '1:1' or '4:5'
+  scriptData            Json                   @map("script_data") // 대본 패널 데이터
+  
+  // 결과
+  generatedImages       Json                   @default("[]") @map("generated_images")
+  failedPanels          Json                   @default("[]") @map("failed_panels")
+  totalTokensUsed       Int                    @default(0) @map("total_tokens_used")
+  
+  // 오류 정보
+  errorMessage          String?                @map("error_message")
+  errorDetails          Json?                  @map("error_details")
+  
+  // 타임스탬프
+  startedAt             DateTime?              @map("started_at")
+  completedAt           DateTime?              @map("completed_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  
+  // 관계
+  panelResults          BatchPanelResult[]
+  
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("batch_generation_job")
+}
+
+// 배치 작업별 패널 생성 결과 모델
+model BatchPanelResult {
+  id                    String                 @id @default(uuid())
+  
+  // 연관 관계
+  batchJobId            String                 @map("batch_job_id")
+  batchJob              BatchGenerationJob     @relation(fields: [batchJobId], references: [id], onDelete: Cascade)
+  
+  panelId               String?                @map("panel_id")
+  panel                 Panel?                 @relation(fields: [panelId], references: [id], onDelete: SetNull)
+  
+  panelOrder            Int                    @map("panel_order")
+  
+  // 생성 상태
+  status                PanelStatus            @default(PENDING)
+  
+  // 생성 결과
+  imageUrl              String?                @map("image_url")
+  generationId          String?                @map("generation_id")
+  generation            Generation?            @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  tokensUsed            Int                    @default(0) @map("tokens_used")
+  
+  // 프롬프트와 설정
+  prompt                String
+  characters            Json                   @default("[]")
+  elements              Json                   @default("[]")
+  
+  // 오류 정보
+  errorMessage          String?                @map("error_message")
+  retryCount            Int                    @default(0) @map("retry_count")
+  
+  // 타임스탬프
+  startedAt             DateTime?              @map("started_at")
+  completedAt           DateTime?              @map("completed_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  
+  @@unique([batchJobId, panelOrder])
+  @@index([batchJobId])
+  @@index([status])
+  @@index([panelOrder])
+  @@map("batch_panel_result")
+}
+
+// 배치 작업 상태 열거형
+enum BatchJobStatus {
+  PENDING           // 대기 중
+  IN_PROGRESS       // 진행 중
+  COMPLETED         // 완료
+  FAILED            // 실패
+  CANCELLED         // 취소됨
+}
+
+// 패널 상태 열거형
+enum PanelStatus {
+  PENDING           // 대기 중
+  IN_PROGRESS       // 진행 중
+  COMPLETED         // 완료
+  FAILED            // 실패
+  SKIPPED           // 건너뜀
+}
+
+// 🚀 실서비스용 프로젝트 컨텍스트 테이블
+model ProjectContext {
+  id                    String                 @id @default(uuid())
+  projectId             String                 @map("project_id")
+  userId                String                 @map("user_id")
+  
+  // 🎭 Gemini 웹툰 연속성 컨텍스트 (JSON 형태) - 최우선
+  webtoonPanelContext   String?                @map("webtoon_panel_context") @db.Text
+  
+  // 🧠 고급 웹툰 컨텍스트 (JSON 형태) - 하위 호환성
+  webtoonContext        String                 @default("{}") @map("webtoon_context") @db.Text
+  
+  // 압축된 컨텍스트 데이터 (토큰 절약) - 하위 호환성
+  storyContext          String                 @default("") @map("story_context") @db.VarChar(800)
+  recentPanels          String                 @default("") @map("recent_panels") @db.VarChar(500)
+  
+  // 메타데이터
+  panelCount            Int                    @default(0) @map("panel_count")
+  tokenUsage            Int                    @default(0) @map("token_usage")
+  
+  // 타임스탬프와 만료
+  lastUpdated           DateTime               @default(now()) @map("last_updated")
+  expiresAt             DateTime               @map("expires_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  
+  // 관계
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project               Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // 인덱스
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([expiresAt]) // 만료된 컨텍스트 정리용
+  @@map("project_context")
 }

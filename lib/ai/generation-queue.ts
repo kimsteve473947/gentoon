@@ -233,16 +233,26 @@ class GenerationQueue {
     const startTime = Date.now();
     
     try {
-      // nano-banana-service 동적 import하여 호출
-      const { nanoBananaService } = await import('./nano-banana-service');
+      // 🔐 사용자별 격리된 nano-banana-service 동적 import
+      const { NanoBananaServiceFactory } = await import('./nano-banana-service');
       
       console.log(`🎨 AI 생성 실행 시작: ${request.id} (패널: ${request.panelId || 'N/A'})`);
       
+      // 🔐 사용자별 격리된 서비스 인스턴스 획득
+      const userService = NanoBananaServiceFactory.getUserInstance(
+        request.userId, 
+        request.id // 요청별 세션 ID로 더 강한 격리
+      );
+      
+      console.log(`🔐 사용자별 격리된 서비스 사용: ${request.userId}-${request.id}`);
+      
       // 타임아웃 설정 (90초로 단축 - 성능 최적화)
-      const generationPromise = nanoBananaService.generateWebtoonPanel(
+      const generationPromise = userService.generateWebtoonPanel(
         request.prompt,
         {
           userId: request.userId,
+          sessionId: request.id, // 세션 ID 전달
+          panelId: request.panelId ? parseInt(request.panelId) : undefined, // 패널 ID 전달 (컨텍스트용)
           ...request.options
         }
       );

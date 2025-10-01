@@ -234,10 +234,16 @@ export async function GET(request: NextRequest) {
 
     const formattedCharacters = characters || [];
 
-    // 구독 정보 조회하여 제한 정보 포함
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: userData.id }
-    });
+    // 구독 정보 조회하여 제한 정보 포함 (에러 방지)
+    let subscription = null;
+    try {
+      subscription = await prisma.subscription.findUnique({
+        where: { userId: userData.id }
+      });
+    } catch (subscriptionError) {
+      console.warn('구독 정보 조회 실패:', subscriptionError);
+      // 기본값으로 FREE 플랜 사용
+    }
     
     const planType = subscription?.plan || 'FREE';
     const planConfig = getPlanConfig(planType);

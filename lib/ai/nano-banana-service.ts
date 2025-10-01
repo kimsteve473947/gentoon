@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { generateOptimizedPrompt, getRecommendedDimensions, type AspectRatio } from './prompt-templates';
 import { WebPOptimizer } from '@/lib/image/webp-optimizer';
 import { createServiceClient } from '@/lib/supabase/service';
+import { ProductionContextManager } from './production-ready-context-manager';
 
 // Gemini 토큰 비용 정보 (token-manager.ts와 일치)
 const GEMINI_COST = {
@@ -20,6 +21,7 @@ const GEMINI_COST = {
 export class NanoBananaService {
   private webpOptimizer: WebPOptimizer;
   private genAI: GoogleGenAI;
+  private model: string = 'gemini-2.5-flash-image-preview';
   
   constructor() {
     // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
@@ -123,12 +125,15 @@ export class NanoBananaService {
   }
   
   /**
-   * 웹툰 패널 생성 (캐릭터 레퍼런스 지원)
+   * 웹툰 패널 생성 (캐릭터 레퍼런스 지원) - 세션 격리 적용
    */
   async generateWebtoonPanel(
     prompt: string, 
     options?: {
       userId?: string;
+      projectId?: string;
+      panelId?: number; // 패널 번호 (컨텍스트 관리용)
+      sessionId?: string; // 배치 생성용 세션 ID
       selectedCharacterIds?: string[];
       referenceImages?: string[];
       elementImageUrls?: string[];
@@ -145,8 +150,15 @@ export class NanoBananaService {
     tokensUsed: number;
     generationTime: number;
     detectedCharacters?: string[];
+    sessionId?: string;
   }> {
     const startTime = Date.now();
+    
+    // 🧠 프로덕션 컨텍스트 시스템 적용
+    const userId = options?.userId || 'anonymous';
+    const projectId = options?.projectId || 'default';
+    
+    console.log(`🎭 이미지 생성 시작: 프로젝트 ${projectId}, 유저 ${userId}`);
     
     try {
       // 캐릭터 정보 로깅
@@ -157,12 +169,34 @@ export class NanoBananaService {
         console.log(`📚 레퍼런스 이미지: ${options.referenceImages.length}개`);
       }
 
+      // 🧠 프로젝트 컨텍스트 로드 및 컨텍스트 인식 프롬프트 생성
+      let contextAwarePrompt = prompt;
+      if (options?.projectId && options?.panelId && userId !== 'anonymous') {
+        console.log(`🧠 프로젝트 컨텍스트 적용: ${options.projectId} - 패널 ${options.panelId}`);
+        
+        // 프로젝트 컨텍스트 기반 향상된 프롬프트 생성
+        contextAwarePrompt = await ProductionContextManager.buildOptimizedPrompt(
+          options.projectId,
+          userId,
+          prompt,
+          options.panelId
+        );
+        
+        console.log(`🧠 컨텍스트 인식 프롬프트 길이: ${contextAwarePrompt.length}자`);
+      } else {
+        console.log(`💭 프로젝트 컨텍스트 미적용 (projectId: ${options?.projectId}, panelId: ${options?.panelId}, userId: ${userId})`);
+      }
+      
       // 사용자 프롬프트 전처리 (텍스트 관련 키워드 필터링)
-      const cleanedPrompt = this.preprocessUserPrompt(prompt);
+      const cleanedPrompt = this.preprocessUserPrompt(contextAwarePrompt);
       
       // 향상된 프롬프트 생성
       const enhancedPrompt = this.buildEnhancedPrompt(cleanedPrompt, options);
-      console.log(`📝 향상된 프롬프트: ${enhancedPrompt}`);
+      
+      // 🧠 컨텍스트 인식 프롬프트 완성
+      const finalPrompt = contextAwarePrompt;
+      console.log(`🎭 웹툰 컨텍스트 프롬프트 적용 완료`);
+      console.log(`📝 최종 프롬프트 미리보기: ${finalPrompt.substring(0, 300)}...`);
       
       // 비율 설정
       const aspectRatio = options?.aspectRatio || '4:5';
@@ -261,8 +295,8 @@ export class NanoBananaService {
       }
       
       // 텍스트 프롬프트 추가 (강화된 텍스트 차단 프롬프트)
-      const finalPrompt = this.addAntiTextSafeguards(enhancedPrompt);
-      contents.push({ text: finalPrompt });
+      const safeguardedPrompt = this.addAntiTextSafeguards(finalPrompt);
+      contents.push({ text: safeguardedPrompt });
       
       // 레퍼런스 이미지가 없으면 경고하지만 계속 진행
       if (successfulReferenceImages === 0 && options?.referenceImages && options.referenceImages.length > 0) {
@@ -460,15 +494,41 @@ export class NanoBananaService {
       
       const generationTime = Date.now() - startTime;
       
+      // 📋 토큰 사용량 기록
+      console.log(`📊 토큰 사용량: ${actualTokensUsed}, 프로젝트: ${projectId}`);
+      
+      // 🧠 프로젝트 컨텍스트 업데이트 (생성 완료 후)
+      if (options?.projectId && options?.panelId && userId !== 'anonymous') {
+        try {
+          // 생성된 이미지에 대한 설명 생성 (간단한 요약)
+          const panelDescription = this.generatePanelDescription(prompt, options);
+          
+          await ProductionContextManager.updateProjectContext(
+            options.projectId,
+            userId,
+            options.panelId,
+            prompt,
+            panelDescription
+          );
+          
+          console.log(`🧠 프로젝트 컨텍스트 업데이트 완료: ${options.projectId} - 패널 ${options.panelId}`);
+        } catch (contextError) {
+          console.warn(`⚠️ 프로젝트 컨텍스트 업데이트 실패:`, contextError);
+          // 컨텍스트 업데이트 실패해도 이미지 생성 결과는 반환
+        }
+      }
+      
       console.log(`✅ 이미지 생성 완료: ${imageUrl} (${generationTime}ms)`);
       console.log(`🔢 Vertex AI SDK 실제 토큰 사용량: ${actualTokensUsed}`);
+      console.log(`🎭 웹툰 컨텍스트 시스템 적용 완료`);
       
       return {
         imageUrl,
         thumbnailUrl,
         tokensUsed: actualTokensUsed, // 실제 Google Gemini API 토큰 사용량 반환
         generationTime,
-        detectedCharacters: options?.selectedCharacterIds
+        detectedCharacters: options?.selectedCharacterIds,
+        // sessionId 제거 - 더 이상 세션 기반 시스템 사용 안함
       };
       
     } catch (error) {
@@ -559,20 +619,27 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
     const aspectRatio: AspectRatio = options?.aspectRatio || '4:5';
     const dimensions = getRecommendedDimensions(aspectRatio);
     
-    // 캐릭터 정보가 있다면 프롬프트에 추가
+    // 🚀 나노바나나 MCP: 강화된 캐릭터 일관성 지시사항
     let characterInstructions = '';
     if (options?.referenceImages?.length > 0) {
       characterInstructions = `
-[Character Reference Information]
-Use the provided reference images to maintain character consistency.
-Keep the character's appearance, style, and proportions exactly as shown in references.
-Adapt to the scene while keeping character identity intact.
+🎯 NANOBANA MCP 캐릭터 일관성 보장:
 
-[Character Consistency Requirements]
-위에 명시된 캐릭터들은 제공된 레퍼런스 이미지와 정확히 일치해야 합니다.
-각 캐릭터의 고유한 특징을 반드시 유지하세요.
-레퍼런스 이미지의 스타일과 외형을 그대로 따라주세요.
-현재 비율(${aspectRatio})에 최적화된 구도로 생성하세요.
+[CRITICAL CHARACTER CONSISTENCY - 절대 준수]
+1. **정확한 외형 복제**: 제공된 레퍼런스 이미지의 캐릭터 외형을 pixel-perfect로 재현
+2. **얼굴 특징**: 눈 모양, 코, 입, 얼굴 윤곽 등 모든 얼굴 특징 정확히 유지
+3. **헤어스타일**: 머리카락 색상, 길이, 스타일, 질감 완벽히 일치
+4. **의상 & 색상**: 옷의 스타일, 색상, 패턴, 액세서리 동일하게 유지
+5. **체형 & 비율**: 캐릭터의 키, 체형, 신체 비율 레퍼런스와 동일
+
+[웹툰 스타일 요구사항]
+- 한국 웹툰의 일관된 아트 스타일 적용
+- 선명한 선화와 생동감 있는 채색
+- ${aspectRatio === '1:1' ? '정사각형 (1:1)' : '세로형 (4:5)'} 비율에 최적화된 구도
+
+❌ 절대 금지: 캐릭터 외형 변경, 다른 스타일 적용, 레퍼런스와 다른 특징
+
+✅ 결과: 레퍼런스 이미지와 100% 일치하는 캐릭터가 새로운 장면에서 자연스럽게 행동하는 모습
       `.trim();
     }
     
@@ -675,6 +742,17 @@ Adapt to the scene while keeping character identity intact.
         const mainImagePath = `generated/${userId}/${aspectRatio}-${timestamp}.webp`;
         const thumbnailPath = `generated/${userId}/${aspectRatio}-${timestamp}-thumb.webp`;
         
+        // 🚀 Supabase Storage에 업로드
+        console.log(`☁️ Supabase Storage에 WebP 이미지 업로드 중...`);
+        console.log(`📊 업로드 정보:`, {
+          mainImagePath,
+          thumbnailPath,
+          mainImageSize: Math.round(webpResult.optimizedSize / 1024) + 'KB',
+          thumbnailSize: Math.round(responsiveSizes.thumbnailSize / 1024) + 'KB',
+          userId: userId.substring(0, 8) + '...',
+          timestamp: new Date().toISOString()
+        });
+        
         // Supabase Storage에 병렬 업로드
         const [mainImageResult, thumbnailResult] = await Promise.all([
           supabase.storage
@@ -694,6 +772,27 @@ Adapt to the scene while keeping character identity intact.
         ]);
         
         if (mainImageResult.error || thumbnailResult.error) {
+          console.error('🚨 Supabase Storage 업로드 상세 오류:', {
+            mainImageError: mainImageResult.error,
+            thumbnailError: thumbnailResult.error,
+            mainImagePath,
+            thumbnailPath,
+            mainImageSize: Math.round(webpResult.optimizedSize / 1024) + 'KB',
+            thumbnailSize: Math.round(responsiveSizes.thumbnailSize / 1024) + 'KB'
+          });
+          
+          // 개발 모드에서는 로컬 파일로 fallback
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔧 개발 모드: Supabase Storage 실패, 로컬 fallback 사용');
+            return {
+              imageUrl: `data:image/webp;base64,${webpResult.optimizedData}`,
+              thumbnailUrl: `data:image/webp;base64,${responsiveSizes.thumbnailBase64}`,
+              originalSize: originalImageSize,
+              optimizedSize: webpResult.optimizedSize,
+              thumbnailSize: responsiveSizes.thumbnailSize
+            };
+          }
+          
           throw new Error(`Supabase Storage 업로드 실패: ${mainImageResult.error?.message || thumbnailResult.error?.message}`);
         }
         
@@ -781,14 +880,22 @@ Adapt to the scene while keeping character identity intact.
       
       // 텍스트 프롬프트 추가
       if (referenceImages.length > 0) {
+        // 🔧 개선된 멀티캐릭터 일관성 프롬프트
+        const characterCount = referenceImages.length;
+        const characterText = characterCount === 1 ? "character" : `${characterCount} characters`;
+        
         parts.push({
-          text: `Use the character design and style shown in the reference image to generate: ${textPrompt}
+          text: `Generate the following scene with ${characterText} from the reference images: ${textPrompt}
 
-CRITICAL CHARACTER CONSISTENCY REQUIREMENTS:
-- Maintain exact character appearance from the reference image
-- Keep character proportions, facial features, and styling identical
-- Adapt the character to the new scene while preserving their visual identity
-- Use the reference image as the definitive guide for character design`
+🎯 MULTI-CHARACTER CONSISTENCY REQUIREMENTS:
+- There are ${characterCount} reference image(s) showing different characters
+- EACH character must maintain their EXACT appearance from their respective reference image
+- Preserve ALL unique features: facial structure, hair, clothing, body proportions
+- Ensure ALL characters appear clearly and recognizably in the scene
+- Distribute attention equally among all ${characterCount} character(s)
+- Keep each character's distinct visual identity while placing them in the new scene
+
+🚨 CRITICAL: Every character from the reference images must be accurately represented`
         });
         
         // 레퍼런스 이미지들 추가
@@ -801,7 +908,7 @@ CRITICAL CHARACTER CONSISTENCY REQUIREMENTS:
           });
         }
         
-        console.log(`📸 레퍼런스 이미지 ${referenceImages.length}개를 Vertex AI 멀티모달 형식으로 전달`);
+        console.log(`📸 멀티캐릭터 레퍼런스 ${referenceImages.length}개를 균등하게 참조하도록 프롬프트 개선`);
       } else {
         parts.push({ text: textPrompt });
       }
@@ -958,58 +1065,768 @@ CRITICAL CHARACTER CONSISTENCY REQUIREMENTS:
 
 
   /**
-   * Vertex AI를 사용한 텍스트 생성 (대본 생성용)
+   * 🎯 nanobananaMCP 방식 이미지 편집 (수정된 버전)
+   * 이전 이미지를 참조하여 일관성을 유지하면서 새로운 패널 생성
+   * 
+   * @param previousImageUrl 이전 패널의 이미지 URL
+   * @param editPrompt 편집 지시사항 (대본 내용)
+   * @param characterReferences 캐릭터 레퍼런스 이미지들
+   * @param aspectRatio 캔버스 비율
+   * @param options 추가 옵션들
    */
-  async generateText(prompt: string): Promise<{ text: string; tokensUsed: number }> {
+  async editImageNanoBananaMCP(
+    previousImageUrl: string,
+    editPrompt: string,
+    characterReferences: any[] = [],
+    aspectRatio: '4:5' | '1:1' = '4:5',
+    options?: {
+      userId?: string;
+      panelId?: number;
+      sessionId?: string;
+      elementImageUrls?: string[];
+    }
+  ): Promise<{
+    imageUrl: string;
+    thumbnailUrl: string;
+    tokensUsed: number;
+    generationTime: number;
+  }> {
+    const startTime = Date.now();
+    const userId = options?.userId || 'anonymous';
+    
+    console.log(`🍌 nanobananaMCP 편집 시작:`, {
+      previousImageUrl: previousImageUrl.substring(0, 100) + '...',
+      editPrompt: editPrompt.substring(0, 100) + '...',
+      characterReferencesCount: characterReferences.length,
+      elementImageUrlsCount: options?.elementImageUrls?.length || 0,
+      aspectRatio,
+      panelId: options?.panelId
+    });
+
+    try {
+      // 🎯 nanobananaMCP 핵심: 이전 이미지 + 편집 지시사항
+      // callGoogleAI 메서드와 동일한 형식으로 contents 구성
+      const contents: any[] = [];
+
+      // 1️⃣ 이전 이미지를 첫 번째로 추가 (nanobananaMCP 방식의 핵심)
+      console.log('📸 이전 이미지 로드 중...');
+      
+      let imageData: string;
+      let mimeType: string = 'image/jpeg';
+      
+      if (previousImageUrl.startsWith('data:image/')) {
+        const [headerPart, base64Part] = previousImageUrl.split(',');
+        imageData = base64Part;
+        const mimeMatch = headerPart.match(/data:([^;]+)/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+        console.log(`✅ 이전 이미지 Data URL 처리 성공: ${mimeType}`);
+      } else {
+        imageData = await this.downloadAndConvertImage(previousImageUrl);
+        console.log(`✅ 이전 이미지 HTTP URL 다운로드 성공`);
+      }
+
+      // 이전 이미지 데이터 검증
+      if (!imageData) {
+        throw new Error('이전 이미지 로드에 실패했습니다');
+      }
+
+      // callGoogleAI와 동일한 형식으로 구성
+      contents.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: imageData
+        }
+      });
+
+      // 2️⃣ 남은 2자리에 최적화해서 이미지 추가 (Gemini 3개 제한 준수)
+      let successfulElementImages = 0;
+      let successfulReferenceImages = 0;
+      const remainingSlots = 2; // 이전 이미지(1개) + 추가 이미지(2개) = 총 3개
+      
+      // 우선순위 기반 이미지 선택 로직
+      const prioritizedImages: Array<{type: 'element' | 'character', imageUrl: string, priority: number}> = [];
+      
+      // 요소 이미지들을 우선순위 큐에 추가 (요소가 더 중요)
+      if (options?.elementImageUrls && options.elementImageUrls.length > 0) {
+        console.log(`🎨 요소 이미지 ${options.elementImageUrls.length}개 발견`);
+        options.elementImageUrls.forEach((imageUrl, index) => {
+          prioritizedImages.push({
+            type: 'element',
+            imageUrl,
+            priority: 100 - index // 첫 번째 요소가 가장 높은 우선순위
+          });
+        });
+      }
+      
+      // 캐릭터 레퍼런스 이미지들을 우선순위 큐에 추가
+      if (characterReferences.length > 0) {
+        console.log(`🎭 캐릭터 레퍼런스 ${characterReferences.length}개 발견`);
+        characterReferences.forEach((ref, index) => {
+          if (ref.imageUrl) {
+            prioritizedImages.push({
+              type: 'character',
+              imageUrl: ref.imageUrl,
+              priority: 50 - index // 요소보다 낮은 우선순위
+            });
+          }
+        });
+      }
+      
+      // 우선순위 정렬 (높은 우선순위 먼저)
+      prioritizedImages.sort((a, b) => b.priority - a.priority);
+      
+      // 🎯 최대 2개만 선택해서 추가 (딱 3개 제한 준수)
+      console.log(`🎯 총 ${prioritizedImages.length}개 이미지 중 상위 ${Math.min(remainingSlots, prioritizedImages.length)}개 선택`);
+      
+      for (let i = 0; i < Math.min(remainingSlots, prioritizedImages.length); i++) {
+        const imageItem = prioritizedImages[i];
+        
+        try {
+          let imageData: string;
+          let mimeType: string = 'image/jpeg';
+          
+          if (imageItem.imageUrl.startsWith('data:image/')) {
+            const [headerPart, base64Part] = imageItem.imageUrl.split(',');
+            imageData = base64Part;
+            const mimeMatch = headerPart.match(/data:([^;]+)/);
+            if (mimeMatch) mimeType = mimeMatch[1];
+          } else {
+            imageData = await this.downloadAndConvertImage(imageItem.imageUrl);
+          }
+          
+          contents.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: imageData
+            }
+          });
+          
+          if (imageItem.type === 'element') {
+            successfulElementImages++;
+            console.log(`✅ 요소 이미지 추가 성공 (우선순위 ${imageItem.priority})`);
+          } else {
+            successfulReferenceImages++;
+            console.log(`✅ 캐릭터 레퍼런스 이미지 추가 성공 (우선순위 ${imageItem.priority})`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ 우선순위 ${imageItem.priority} ${imageItem.type} 이미지 로드 실패:`, error);
+        }
+      }
+      
+      console.log(`🎯 최적화 완료: 총 ${contents.length}개 이미지 (이전:1 + 요소:${successfulElementImages} + 캐릭터:${successfulReferenceImages} = ${contents.length}/3)`);
+
+      // 4️⃣ nanobananaMCP 편집 지시사항 (차별화와 일관성의 균형)
+      const panelInfo = options?.panelId ? `패널 ${options.panelId}` : '다음 패널';
+      const elementInfo = successfulElementImages > 0 ? `(${successfulElementImages}개 요소 참조 중)` : '';
+      const characterInfo = successfulReferenceImages > 0 ? `(${successfulReferenceImages}명 캐릭터 참조 중)` : '';
+      
+      const nanoBananaPrompt = `🎯 NANOBANA MCP 편집 모드: ${panelInfo} - 이전 이미지를 기반으로 명확히 다른 다음 장면 생성 ${elementInfo} ${characterInfo}
+
+📋 현재 패널의 새로운 장면:
+${editPrompt}
+
+🔄 ESSENTIAL CHANGES (반드시 변경):
+1. **장면 전환**: 이전 컷과 확실히 구별되는 새로운 장면으로 변경
+2. **액션 변화**: 캐릭터의 동작, 표정, 포즈를 현재 대본에 맞게 완전히 새롭게 구성
+3. **시점 변화**: 카메라 앵글, 거리, 구도를 다르게 설정하여 시각적 다양성 확보 
+4. **상황 전개**: 스토리 진행에 따른 명확한 상황 변화 표현
+5. **요소 활용**: ${successfulElementImages > 0 ? '제공된 요소 이미지들을 장면에 자연스럽게 통합' : '장면에 맞는 배경 요소들 구성'}
+
+🎨 CONSISTENCY RULES (유지 사항):
+1. **아트 스타일**: 동일한 웹툰 그림체, 선 굵기, 채색 방식 유지
+2. **캐릭터 아이덴티티**: ${successfulReferenceImages > 0 ? '레퍼런스 이미지의 캐릭터 외형 정확히 유지' : '기본 캐릭터 특징 유지'} (표정/포즈는 변경)
+3. **색상 톤**: 전체적인 색상 팔레트와 분위기 톤 유지
+
+🚀 DIFFERENTIATION FOCUS:
+- 이전 이미지와 같은 포즈/표정 절대 금지
+- 새로운 동작과 감정 표현으로 스토리 진행감 강화
+- 다른 카메라 앵글 사용으로 시각적 흥미 증대
+- 배경이나 환경도 상황에 맞게 자연스럽게 변화
+- ${panelInfo}에 맞는 독특한 구성과 연출
+
+❌ 절대 금지:
+- 텍스트, 말풍선, 글자 추가 금지
+- 이전 컷과 동일한 포즈/표정 재사용 금지
+- 정적이고 변화 없는 구성 금지
+- 무의미한 반복이나 복사
+
+📐 비율: ${aspectRatio === '1:1' ? '정사각형 (1:1)' : '세로형 (4:5)'}
+
+결과: ${panelInfo}를 위한 일관된 스타일의 완전히 새로운 장면 - 스토리 진행이 명확히 느껴지는 역동적인 웹툰 컷`;
+
+      // 강화된 텍스트 차단 안전장치 적용
+      const safeguardedPrompt = this.addAntiTextSafeguards(nanoBananaPrompt);
+      contents.push({ text: safeguardedPrompt });
+
+      console.log(`✅ contents 구성 완료: ${contents.length}개 항목`, {
+        previousImage: 1,
+        elementImages: successfulElementImages,
+        characterReferences: successfulReferenceImages,
+        textPrompt: 1,
+        totalContents: contents.length
+      });
+
+      // 5️⃣ callGoogleAI 메서드 사용 (기존 generateWebtoonPanel과 동일한 방식)
+      console.log(`🚀 Vertex AI SDK ${panelInfo} 편집 호출...`);
+      const result = await this.callGoogleAI(contents);
+      const response = result.response;
+      
+      // 실제 토큰 사용량 추출
+      let actualTokensUsed = 0;
+      if (response.usageMetadata) {
+        actualTokensUsed = response.usageMetadata.totalTokenCount || 0;
+        console.log('🔢 편집 토큰 사용량:', actualTokensUsed);
+      } else {
+        actualTokensUsed = GEMINI_COST.TOKENS_PER_IMAGE * 1.2; // 추정치 사용
+        console.warn('⚠️ 토큰 사용량을 가져올 수 없어 추정치 사용:', actualTokensUsed);
+      }
+      
+      // 응답 검증
+      const candidates = response.candidates;
+      if (!candidates || candidates.length === 0) {
+        throw new Error('편집된 이미지 생성 결과가 없습니다');
+      }
+      
+      const candidate = candidates[0];
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        if (candidate.finishReason === 'PROHIBITED_CONTENT' || candidate.finishReason === 'SAFETY') {
+          throw new Error('CONTENT_POLICY_VIOLATION');
+        }
+        throw new Error(`이미지 편집이 중단됨: ${candidate.finishReason}`);
+      }
+      
+      if (!candidate.content || !candidate.content.parts) {
+        throw new Error('편집된 이미지 데이터가 없습니다');
+      }
+      
+      // 이미지 데이터 찾기
+      let editedImageData: string | null = null;
+      for (const part of candidate.content.parts) {
+        if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+          editedImageData = part.inlineData.data;
+          break;
+        }
+      }
+      
+      if (!editedImageData) {
+        throw new Error('편집된 이미지 데이터를 찾을 수 없습니다');
+      }
+
+      // 5️⃣ 이미지 최적화 및 저장 (generateWebtoonPanel과 동일한 방식)
+      const { imageUrl, thumbnailUrl } = await this.saveGeneratedImage(
+        editedImageData,
+        userId,
+        aspectRatio
+      );
+
+      const generationTime = Date.now() - startTime;
+      console.log(`✅ nanobananaMCP ${panelInfo} 편집 완료`, {
+        generationTime: `${generationTime}ms`,
+        tokensUsed: actualTokensUsed,
+        elementImages: successfulElementImages,
+        characterReferences: successfulReferenceImages,
+        imageUrl: imageUrl.substring(0, 50) + '...'
+      });
+
+      return {
+        imageUrl,
+        thumbnailUrl,
+        tokensUsed: actualTokensUsed,
+        generationTime
+      };
+
+    } catch (error) {
+      console.error('❌ nanobananaMCP 편집 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🎯 기존 editImage (호환성 유지)
+   */
+  async editImage(
+    previousImageUrl: string,
+    editPrompt: string,
+    options?: {
+      userId?: string;
+      projectId?: string;
+      panelId?: number;
+      sessionId?: string;
+      selectedCharacterIds?: string[];
+      referenceImages?: string[];
+      elementImageUrls?: string[];
+      characterDescriptions?: Map<string, string>;
+      style?: string;
+      negativePrompt?: string;
+      aspectRatio?: '4:5' | '1:1';
+      width?: number;
+      height?: number;
+    }
+  ): Promise<{
+    imageUrl: string;
+    thumbnailUrl: string;
+    tokensUsed: number;
+    generationTime: number;
+    detectedCharacters?: string[];
+    sessionId?: string;
+  }> {
+    // nanobananaMCP 방식으로 리다이렉트
+    const characterReferences = options?.referenceImages?.map(url => ({ imageUrl: url })) || [];
+    
+    const result = await this.editImageNanoBananaMCP(
+      previousImageUrl,
+      editPrompt,
+      characterReferences,
+      options?.aspectRatio || '4:5',
+      {
+        userId: options?.userId,
+        panelId: options?.panelId,
+        sessionId: options?.sessionId
+      }
+    );
+
+    return {
+      ...result,
+      detectedCharacters: [],
+      sessionId: options?.sessionId
+    };
+  }
+
+  /**
+   * 🎯 기존 코드 (삭제될 예정)
+   */
+  async editImageOld(
+    previousImageUrl: string,
+    editPrompt: string,
+    options?: {
+      userId?: string;
+      projectId?: string;
+      panelId?: number;
+      sessionId?: string;
+      selectedCharacterIds?: string[];
+      referenceImages?: string[];
+      elementImageUrls?: string[];
+      characterDescriptions?: Map<string, string>;
+      style?: string;
+      negativePrompt?: string;
+      aspectRatio?: '4:5' | '1:1';
+      width?: number;
+      height?: number;
+    }
+  ): Promise<{
+    imageUrl: string;
+    thumbnailUrl: string;
+    tokensUsed: number;
+    generationTime: number;
+    detectedCharacters?: string[];
+    sessionId?: string;
+  }> {
+    const startTime = Date.now();
+    
+    const userId = options?.userId || 'anonymous';
+    const projectId = options?.projectId || 'default';
+    
+    console.log(`🎭 이미지 편집 시작: 프로젝트 ${projectId}, 유저 ${userId}`);
+    console.log(`📸 이전 이미지 참조: ${previousImageUrl.substring(0, 100)}...`);
+    
+    try {
+      // 🧠 프로젝트 컨텍스트 로드 및 컨텍스트 인식 프롬프트 생성
+      let contextAwarePrompt = editPrompt;
+      if (options?.projectId && options?.panelId && userId !== 'anonymous') {
+        console.log(`🧠 프로젝트 컨텍스트 적용: ${options.projectId} - 패널 ${options.panelId}`);
+        
+        contextAwarePrompt = await ProductionContextManager.buildOptimizedPrompt(
+          options.projectId,
+          userId,
+          editPrompt,
+          options.panelId
+        );
+        
+        console.log(`🧠 컨텍스트 인식 프롬프트 길이: ${contextAwarePrompt.length}자`);
+      }
+      
+      // 편집용 프롬프트 구성 (nanobananaMCP 방식)
+      const finalEditPrompt = `이 이미지를 기반으로 다음과 같이 수정해주세요:
+
+${contextAwarePrompt}
+
+중요한 지시사항:
+- 기존 이미지의 배경, 장소, 전체적인 구도는 최대한 유지하세요
+- 캐릭터의 기본 외모와 의상은 동일하게 유지하세요  
+- 오직 요청된 행동, 표정, 포즈만 변경하세요
+- 웹툰 스타일의 일관성을 유지하세요
+- 말풍선이나 텍스트는 추가하지 마세요`;
+
+      console.log(`📝 편집 프롬프트: ${finalEditPrompt.substring(0, 200)}...`);
+      
+      // 비율 설정
+      const aspectRatio = options?.aspectRatio || '4:5';
+      console.log(`🎨 이미지 편집 시작: ${aspectRatio} 비율`);
+      
+      // Gemini API를 위한 컨텐츠 구성 - 이전 이미지를 첫 번째로 추가
+      const contents: any[] = [];
+      
+      // 1️⃣ 이전 이미지를 최우선으로 추가 (nanobananaMCP 방식)
+      try {
+        let imageData: string;
+        let mimeType: string = 'image/jpeg';
+        
+        if (previousImageUrl.startsWith('data:image/')) {
+          // Data URL인 경우
+          const [headerPart, base64Part] = previousImageUrl.split(',');
+          imageData = base64Part;
+          const mimeMatch = headerPart.match(/data:([^;]+)/);
+          if (mimeMatch) {
+            mimeType = mimeMatch[1];
+          }
+        } else {
+          // HTTP URL인 경우
+          const response = await fetch(previousImageUrl);
+          if (!response.ok) {
+            throw new Error(`이전 이미지 로드 실패: ${response.status}`);
+          }
+          const buffer = await response.arrayBuffer();
+          const base64String = Buffer.from(buffer).toString('base64');
+          imageData = base64String;
+          
+          const contentType = response.headers.get('content-type');
+          if (contentType) {
+            mimeType = contentType;
+          }
+        }
+        
+        contents.push({
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: imageData
+              }
+            }
+          ]
+        });
+        
+        console.log(`✅ 이전 이미지 로드 성공 (${mimeType})`);
+        
+      } catch (error) {
+        console.error('❌ 이전 이미지 로드 실패:', error);
+        throw new Error(`이전 이미지를 로드할 수 없습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
+      
+      // 2️⃣ 캐릭터 레퍼런스 이미지 추가 (필요시)
+      if (options?.referenceImages && options.referenceImages.length > 0) {
+        console.log(`🎭 캐릭터 레퍼런스 이미지 ${options.referenceImages.length}개 추가`);
+        
+        for (const refUrl of options.referenceImages) {
+          try {
+            let imageData: string;
+            let mimeType: string = 'image/jpeg';
+            
+            if (refUrl.startsWith('data:image/')) {
+              const [headerPart, base64Part] = refUrl.split(',');
+              imageData = base64Part;
+              const mimeMatch = headerPart.match(/data:([^;]+)/);
+              if (mimeMatch) {
+                mimeType = mimeMatch[1];
+              }
+            } else {
+              const response = await fetch(refUrl);
+              if (!response.ok) continue;
+              const buffer = await response.arrayBuffer();
+              imageData = Buffer.from(buffer).toString('base64');
+              const contentType = response.headers.get('content-type');
+              if (contentType) {
+                mimeType = contentType;
+              }
+            }
+            
+            contents.push({
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: imageData
+                  }
+                }
+              ]
+            });
+            
+          } catch (error) {
+            console.warn(`⚠️ 레퍼런스 이미지 로드 실패: ${refUrl}`, error);
+          }
+        }
+      }
+      
+      // 3️⃣ 편집 지시사항 텍스트 추가
+      contents.push({
+        role: 'user',
+        parts: [{ text: finalEditPrompt }]
+      });
+      
+      // Gemini API 호출
+      const { width, height } = getRecommendedDimensions(aspectRatio);
+      
+      console.log('🚀 Vertex AI SDK 호출 시작... {', 
+        `model: '${this.model}', contentCount: ${contents.length}, hasReferenceImages: true`
+      );
+      
+      const response = await this.genAI.models.generateContentStream({
+        model: this.model,
+        contents: contents,
+        config: {
+          responseModalities: ['IMAGE'],
+          imageGenerationConfig: {
+            aspectRatio: aspectRatio === '1:1' ? '1:1' : '4:5'
+          }
+        }
+      });
+      
+      let imageData = '';
+      let tokensUsed = 0;
+      let candidatesTokens = 0;
+      let promptTokens = 0;
+      
+      for await (const chunk of response) {
+        console.log('🔍 Chunk:', {
+          hasText: !!chunk.candidates?.[0]?.content?.parts?.some(p => p.text),
+          hasData: !!chunk.candidates?.[0]?.content?.parts?.some(p => p.inlineData),
+          hasCandidates: !!chunk.candidates?.length,
+          hasUsageMetadata: !!chunk.usageMetadata,
+          hasPromptFeedback: !!chunk.promptFeedback,
+          keys: Object.keys(chunk)
+        });
+
+        if (chunk.candidates?.[0]?.content?.parts) {
+          for (const part of chunk.candidates[0].content.parts) {
+            if (part.inlineData?.data) {
+              const dataSize = part.inlineData.data.length;
+              console.log(`🖼️ 이미지 발견: ${part.inlineData.mimeType}, ${dataSize} chars`);
+              imageData += part.inlineData.data;
+            }
+          }
+        }
+        
+        if (chunk.usageMetadata) {
+          candidatesTokens = chunk.usageMetadata.candidatesTokens || 0;
+          promptTokens = chunk.usageMetadata.promptTokens || 0;
+          tokensUsed = chunk.usageMetadata.totalTokens || (candidatesTokens + promptTokens);
+        }
+      }
+      
+      if (!imageData) {
+        throw new Error('이미지 데이터를 받지 못했습니다');
+      }
+      
+      const result = {
+        imageData: Buffer.from(imageData, 'base64'),
+        tokensUsed
+      };
+      
+      // 이미지 최적화 및 업로드
+      const optimizedImage = await this.webpOptimizer.optimizeAndUpload(
+        result.imageData,
+        `edit_${projectId}_${options?.panelId || Date.now()}`,
+        userId
+      );
+      
+      const generationTime = Date.now() - startTime;
+      console.log(`✅ 이미지 편집 완료 (${generationTime}ms)`);
+      
+      return {
+        imageUrl: optimizedImage.url,
+        thumbnailUrl: optimizedImage.thumbnailUrl,
+        tokensUsed: result.tokensUsed,
+        generationTime,
+        sessionId: options?.sessionId
+      };
+      
+    } catch (error) {
+      console.error('❌ 이미지 편집 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🎨 이미지 생성 메서드 (generateWebtoonPanel의 alias)
+   * 배치 생성에서 사용하기 위한 간단한 인터페이스
+   */
+  async generateImage(
+    prompt: string,
+    aspectRatio: '4:5' | '1:1' = '4:5',
+    characterReferences?: any[],
+    options?: {
+      requestType?: string;
+      panelIndex?: number;
+      totalPanels?: number;
+      userId?: string;
+      projectId?: string;
+      sessionId?: string;
+    }
+  ): Promise<{
+    imageUrl: string;
+    thumbnailUrl?: string;
+    tokensUsed: number;
+    generationTime?: number;
+  }> {
+    console.log(`🎨 generateImage 호출: ${prompt.substring(0, 50)}...`);
+    
+    // generateWebtoonPanel 호출
+    const result = await this.generateWebtoonPanel(prompt, {
+      userId: options?.userId,
+      projectId: options?.projectId,
+      panelId: options?.panelIndex,
+      sessionId: options?.sessionId,
+      aspectRatio,
+      referenceImages: characterReferences?.map(ref => ref.imageUrl).filter(Boolean) || []
+    });
+    
+    return {
+      imageUrl: result.imageUrl,
+      thumbnailUrl: result.thumbnailUrl,
+      tokensUsed: result.tokensUsed,
+      generationTime: result.generationTime
+    };
+  }
+
+  /**
+   * Vertex AI를 사용한 텍스트 생성 (대본 생성용) - 세션 격리 적용
+   */
+  async generateText(
+    prompt: string, 
+    options?: {
+      userId?: string;
+      projectId?: string;
+      sessionId?: string;
+    }
+  ): Promise<{ text: string; tokensUsed: number; sessionId?: string }> {
     try {
       console.log('🔤 Vertex AI 텍스트 생성 시작...');
       
-      // Vertex AI 텍스트 생성 API 호출 - 재시도 로직 적용
+      // 🧠 프로덕션 컨텍스트 시스템 적용
+      const userId = options?.userId || 'anonymous';
+      const projectId = options?.projectId || 'default';
+      
+      console.log(`📝 텍스트 생성 시작: 프로젝트 ${projectId}, 유저 ${userId}`);
+      
+      // Vertex AI 텍스트 생성 API 호출 - 이미지 생성과 동일한 방식 사용
       const response = await this.retryWithBackoff(async () => {
-        return await this.genAI.models.generateContent({
-          model: 'gemini-2.5-flash', // 텍스트 생성용 모델 (최신 안정 버전)
+        return await this.genAI.models.generateContentStream({
+          model: 'gemini-2.5-flash',
           contents: [
             {
               role: 'USER',
               parts: [{ text: prompt }]
             }
-          ]
+          ],
+          config: {
+            responseModalities: ['TEXT'],
+          },
         });
       });
 
-      // Vertex AI SDK 응답 구조 확인
-      console.log('🔍 Vertex AI 텍스트 응답 구조:', {
-        hasResponse: !!response,
-        hasCandidates: !!response.candidates,
-        candidateCount: response.candidates?.length || 0
-      });
+      console.log('✅ Vertex AI SDK 텍스트 응답 수신 완료');
 
-      const candidates = response.candidates;
-      const usageMetadata = response.usageMetadata;
+      // 스트리밍 응답에서 텍스트 데이터 수집
+      let generatedText = '';
+      let totalTokens = 0;
+      let allChunks = [];
+      
+      for await (const chunk of response) {
+        console.log('🔍 텍스트 Chunk:', {
+          hasText: !!chunk.text,
+          hasUsageMetadata: !!chunk.usageMetadata,
+          hasPromptFeedback: !!chunk.promptFeedback,
+          keys: Object.keys(chunk)
+        });
+        
+        allChunks.push(chunk);
+        
+        // 텍스트 데이터 수집
+        if (chunk.text) {
+          generatedText += chunk.text;
+          console.log('📝 텍스트 수신:', chunk.text.substring(0, 100) + '...');
+        }
+        
+        // 토큰 사용량 수집
+        if (chunk.usageMetadata) {
+          totalTokens = chunk.usageMetadata.totalTokenCount || 0;
+        }
+        
+        // promptFeedback 확인 - 안전 필터링 감지
+        if (chunk.promptFeedback?.blockReason) {
+          console.log('🚫 안전 필터링으로 요청 차단됨:', chunk.promptFeedback.blockReason);
+          throw new Error('CONTENT_POLICY_VIOLATION');
+        }
+      }
 
-      if (!candidates?.[0]?.content?.parts?.[0]?.text) {
+      if (!generatedText || generatedText.trim().length === 0) {
         throw new Error('Vertex AI 텍스트 응답이 없습니다');
       }
 
-      const generatedText = candidates[0].content.parts[0].text;
-      const tokensUsed = usageMetadata?.totalTokenCount || 0;
+      const tokensUsed = totalTokens || 1000; // 기본값 설정
+      
+      // 📋 토큰 사용량 기록
+      console.log(`📊 텍스트 생성 토큰 사용량: ${tokensUsed}, 프로젝트: ${projectId}`);
       
       console.log('✅ Vertex AI 텍스트 생성 완료:', {
         textLength: generatedText.length,
         tokensUsed,
-        promptTokens: usageMetadata?.promptTokenCount || 0,
-        candidatesTokens: usageMetadata?.candidatesTokenCount || 0
+        chunksProcessed: allChunks.length
       });
+      console.log(`🧠 프로덕션 컨텍스트 시스템 텍스트 생성 완료`);
 
       return {
         text: generatedText,
         tokensUsed
+        // sessionId 제거 - 더 이상 세션 기반 시스템 사용 안함
       };
       
     } catch (error) {
       console.error('❌ Vertex AI 텍스트 생성 실패:', error);
+      console.error('❌ 에러 상세 정보:', {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        hasCredentials: !!this.genAI,
+        promptLength: prompt?.length
+      });
+      
+      // 더 구체적인 에러 메시지 제공
+      if (error instanceof Error) {
+        if (error.message.includes('UNAUTHENTICATED') || error.message.includes('authentication')) {
+          throw new Error('Vertex AI 인증 실패: API 키 또는 서비스 계정을 확인해주세요');
+        }
+        if (error.message.includes('PERMISSION_DENIED')) {
+          throw new Error('Vertex AI 권한 부족: 프로젝트 설정을 확인해주세요');
+        }
+        if (error.message.includes('QUOTA_EXCEEDED')) {
+          throw new Error('Vertex AI 할당량 초과: 사용량을 확인해주세요');
+        }
+        if (error.message.includes('timeout') || error.message.includes('deadline')) {
+          throw new Error('Vertex AI 요청 시간 초과: 잠시 후 다시 시도해주세요');
+        }
+      }
+      
       throw new Error(`Vertex AI 텍스트 생성 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
+  }
+
+  /**
+   * 생성된 패널에 대한 간단한 설명 생성 (컨텍스트 관리용)
+   */
+  private generatePanelDescription(prompt: string, options?: any): string {
+    const characters = options?.selectedCharacterIds?.length 
+      ? `등장인물: ${options.selectedCharacterIds.length}명` 
+      : '등장인물 없음';
+    
+    const aspectRatio = options?.aspectRatio || '4:5';
+    
+    // 프롬프트에서 핵심 키워드 추출
+    const cleanPrompt = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+    
+    return `${cleanPrompt} (${characters}, ${aspectRatio} 비율)`;
   }
 
   /**
@@ -1020,5 +1837,68 @@ CRITICAL CHARACTER CONSISTENCY REQUIREMENTS:
   }
 }
 
-// 싱글톤 인스턴스 내보내기
-export const nanoBananaService = new NanoBananaService();
+/**
+ * 🔐 사용자별 격리된 NanoBananaService 팩토리
+ * 멀티테넌트 환경에서 완전한 사용자 격리 보장
+ */
+export class NanoBananaServiceFactory {
+  private static instances = new Map<string, NanoBananaService>();
+  
+  /**
+   * 사용자별 격리된 서비스 인스턴스 생성/반환
+   */
+  static getUserInstance(userId: string, sessionId?: string): NanoBananaService {
+    // 세션별 격리 (더 강한 격리)
+    const instanceKey = sessionId ? `${userId}-${sessionId}` : userId;
+    
+    if (!this.instances.has(instanceKey)) {
+      console.log(`🔐 새로운 사용자별 NanoBananaService 인스턴스 생성: ${instanceKey}`);
+      this.instances.set(instanceKey, new NanoBananaService());
+    }
+    
+    return this.instances.get(instanceKey)!;
+  }
+  
+  /**
+   * 메모리 정리: 만료된 세션 정리
+   */
+  static cleanup(sessionId?: string) {
+    if (sessionId) {
+      const keysToDelete = Array.from(this.instances.keys()).filter(key => key.includes(sessionId));
+      keysToDelete.forEach(key => {
+        this.instances.delete(key);
+        console.log(`🧹 만료된 NanoBananaService 인스턴스 정리: ${key}`);
+      });
+    }
+  }
+  
+  /**
+   * 인스턴스 통계
+   */
+  static getStats() {
+    return {
+      activeInstances: this.instances.size,
+      instanceKeys: Array.from(this.instances.keys())
+    };
+  }
+}
+
+// 🔐 안전한 팩토리 패턴으로 변경
+// 하위 호환성을 위한 기본 인스턴스 (개발용)
+let _nanoBananaService: NanoBananaService | null = null;
+
+function createNanoBananaService(): NanoBananaService {
+  try {
+    if (!_nanoBananaService) {
+      console.log('🔧 NanoBananaService 초기화 시작...');
+      _nanoBananaService = new NanoBananaService();
+      console.log('✅ NanoBananaService 초기화 완료');
+    }
+    return _nanoBananaService;
+  } catch (error) {
+    console.error('❌ NanoBananaService 초기화 실패:', error);
+    throw new Error(`NanoBananaService 초기화 실패: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export const nanoBananaService = createNanoBananaService();

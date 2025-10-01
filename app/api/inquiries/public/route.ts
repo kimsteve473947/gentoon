@@ -55,8 +55,8 @@ export async function POST(request: NextRequest) {
                     'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 
-    // 첨부파일 처리
-    const attachments: string[] = [];
+    // 첨부파일 처리 (uploads 버킷 사용)
+    const attachments: Array<{url: string, name: string, size: number, type: string}> = [];
     const fileEntries = Array.from(formData.entries()).filter(([key]) => key.startsWith('file-'));
 
     if (fileEntries.length > 0) {
@@ -89,13 +89,13 @@ export async function POST(request: NextRequest) {
             const timestamp = Date.now();
             const randomId = Math.random().toString(36).substring(2, 8);
             const safeFileName = file.name.replace(/[^a-zA-Z0-9.-_가-힣]/g, '_');
-            const fileName = `inquiry-${timestamp}-${randomId}-${safeFileName}`;
+            const fileName = `inquiries/inquiry-${timestamp}-${randomId}-${safeFileName}`;
 
-            // Supabase Storage에 업로드 (기존 webtoon-images 버킷 사용)
-            console.log(`📤 스토리지 업로드 시작: inquiries/${fileName}`);
+            // Supabase Storage에 업로드 (uploads 버킷 사용)
+            console.log(`📤 스토리지 업로드 시작: ${fileName}`);
             const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('webtoon-images')
-              .upload(`inquiries/${fileName}`, file, {
+              .from('uploads')
+              .upload(fileName, file, {
                 contentType: file.type,
                 cacheControl: '3600',
                 upsert: false
@@ -110,39 +110,48 @@ export async function POST(request: NextRequest) {
 
             // 공개 URL 생성
             const { data: urlData } = supabase.storage
-              .from('webtoon-images')
-              .getPublicUrl(`inquiries/${fileName}`);
+              .from('uploads')
+              .getPublicUrl(fileName);
 
-            attachments.push(urlData.publicUrl);
+            attachments.push({
+              url: urlData.publicUrl,
+              name: file.name,
+              size: file.size,
+              type: file.type
+            });
+            
             console.log(`✅ 파일 업로드 완료: ${file.name} → ${fileName}`);
           } catch (error) {
             console.error(`파일 처리 오류 (${file.name}):`, error);
-            throw error; // 상위로 오류 전파
+            // 개별 파일 오류는 로그만 남기고 계속 진행
+            console.warn(`⚠️ 파일 ${file.name} 업로드 실패, 계속 진행합니다.`);
           }
         }
       }
     }
 
-    // 고유한 문의사항 ID 생성 (text 타입)
-    const inquiryId = `inq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     // 첨부파일 정보를 메시지에 포함
     let finalMessage = `[전화번호: ${phone}]\n\n${message}`;
+    
+    // 첨부파일이 있다면 메시지에 기록
     if (attachments.length > 0) {
-      finalMessage += `\n\n[첨부파일 ${attachments.length}개]\n${attachments.map((url, index) => `${index + 1}. ${url}`).join('\n')}`;
+      finalMessage += `\n\n[첨부파일 ${attachments.length}개]\n${attachments.map((attachment, index) => 
+        `${index + 1}. ${attachment.name} (${(attachment.size / 1024).toFixed(1)}KB)`
+      ).join('\n')}`;
     }
 
-    // 문의사항 데이터베이스에 저장
+    // 문의사항 데이터베이스에 저장 (Supabase는 snake_case 필드명 사용)
     const inquiryData = {
       subject,
       message: finalMessage,
       category,
       priority: 'normal' as const,
       status: 'pending' as const,
-      userEmail: email, // user_email 매핑
-      userId: user.id, // user_id 매핑
-      userAgent: userAgent, // user_agent 매핑
-      ipAddress: clientIp, // ip_address 매핑
+      user_email: email, // snake_case로 직접 매핑
+      user_id: user.id, // snake_case로 직접 매핑
+      user_agent: userAgent, // snake_case로 직접 매핑
+      ip_address: clientIp, // snake_case로 직접 매핑
+      attachments: attachments.length > 0 ? attachments : null, // JSON 형태로 첨부파일 정보 저장
     };
 
     console.log('💾 문의사항 데이터 저장 시도:', {

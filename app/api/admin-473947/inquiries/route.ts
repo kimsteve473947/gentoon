@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         userEmail:user_email,
         userAgent:user_agent,
         ipAddress:ip_address,
+        attachments,
         createdAt:created_at,
         updatedAt:updated_at,
         user:user_id (
@@ -248,6 +249,7 @@ export async function PATCH(request: NextRequest) {
         respondedBy:responded_by,
         respondedAt:responded_at,
         userEmail:user_email,
+        attachments,
         createdAt:created_at,
         updatedAt:updated_at,
         user:user_id (
@@ -270,29 +272,22 @@ export async function PATCH(request: NextRequest) {
 
     // 답변이 추가된 경우 이메일 발송
     if (adminResponse && updatedInquiry) {
-      console.log(`📧 [Admin] 이메일 발송 준비 중...`, {
-        hasAdminResponse: !!adminResponse,
-        hasUpdatedInquiry: !!updatedInquiry,
-        userEmail: updatedInquiry.user?.email,
-        userEmailField: updatedInquiry.userEmail,
-        inquiryId: updatedInquiry.id
-      });
+      console.log(`📧 [Admin] 이메일 발송 준비 중...`);
 
       try {
+        // 계정 이메일로 발송 (이메일 필드가 읽기 전용이므로 계정 이메일과 동일함)
         const recipientEmail = updatedInquiry.user?.email || updatedInquiry.userEmail;
         const recipientName = updatedInquiry.user?.name;
 
-        console.log(`📧 [Admin] 수신자 정보:`, {
-          recipientEmail,
-          recipientName,
-          hasRecipientEmail: !!recipientEmail
+        console.log(`📧 [Admin] 이메일 발송 대상:`, {
+          ACCOUNT_EMAIL: updatedInquiry.user?.email,
+          USER_EMAIL_FIELD: updatedInquiry.userEmail,
+          FINAL_RECIPIENT: recipientEmail
         });
 
         if (recipientEmail) {
-          console.log(`📧 [Admin] sendInquiryResponse 호출 중...`);
-          
           await sendInquiryResponse({
-            userEmail: recipientEmail,
+            userEmail: recipientEmail, // 계정 이메일로 발송
             userName: recipientName,
             subject: updatedInquiry.subject,
             originalMessage: updatedInquiry.message,
@@ -302,11 +297,7 @@ export async function PATCH(request: NextRequest) {
 
           console.log(`✅ [Admin] 답변 이메일 발송 성공: ${inquiryId} → ${recipientEmail}`);
         } else {
-          console.warn(`⚠️  [Admin] 이메일 주소가 없어 발송하지 않음: ${inquiryId}`);
-          console.warn(`⚠️  [Admin] 디버깅 정보:`, {
-            'updatedInquiry.user': updatedInquiry.user,
-            'updatedInquiry.userEmail': updatedInquiry.userEmail
-          });
+          console.error(`❌ [Admin] 사용자 입력 이메일이 없음: ${inquiryId}`);
         }
       } catch (emailError) {
         // 이메일 발송 실패는 로그만 남기고 API는 성공 처리

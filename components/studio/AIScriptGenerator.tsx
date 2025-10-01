@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,25 +40,57 @@ interface Element {
 interface ScriptPanel {
   order: number;
   prompt: string;
-  characters: string[];
-  elements: string[];
+  characters: string[]; // AI 생성 캐릭터 이름들 (참고용)
+  elements: string[]; // AI 생성 요소 이름들 (참고용)
+  characterIds?: string[]; // 🚀 실제 DB 캐릭터 ID들
+  elementIds?: string[]; // 🚀 실제 DB 요소 ID들
 }
 
 interface AIScriptGeneratorProps {
   onScriptGenerated: (panels: ScriptPanel[]) => void;
   onApplyToCanvas?: (panels: ScriptPanel[]) => void;
   className?: string;
+  generatedScript?: ScriptPanel[];
+  setGeneratedScript?: (script: ScriptPanel[]) => void;
+  editedScript?: ScriptPanel[];
+  setEditedScript?: (script: ScriptPanel[]) => void;
+  // 🚀 외부에서 전달받는 캐릭터 및 요소 선택 상태
+  selectedCharacterIds?: string[];
+  selectedElementIds?: string[];
 }
 
-export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, className }: AIScriptGeneratorProps) {
+export function AIScriptGenerator({ 
+  onScriptGenerated, 
+  onApplyToCanvas, 
+  className,
+  generatedScript: externalGeneratedScript,
+  setGeneratedScript: setExternalGeneratedScript,
+  editedScript: externalEditedScript,
+  setEditedScript: setExternalEditedScript,
+  selectedCharacterIds = [],
+  selectedElementIds = []
+}: AIScriptGeneratorProps) {
   const [storyPrompt, setStoryPrompt] = useState('');
   const [selectedPanelCount, setSelectedPanelCount] = useState<'3-5' | '6-8' | '8-10'>('3-5');
-  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
-  const [selectedElements, setSelectedElements] = useState<string[]>([]);
+  // 🚀 외부에서 전달받은 선택 상태 사용 (내부 상태 제거)
+  // const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  // const [selectedElements, setSelectedElements] = useState<string[]>([]);
+  
+  // 🚀 외부 선택 상태를 내부에서 사용
+  const selectedCharacters = selectedCharacterIds;
+  const selectedElements = selectedElementIds;
   const [characters, setCharacters] = useState<Character[]>([]);
   const [elements, setElements] = useState<Element[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedScript, setGeneratedScript] = useState<ScriptPanel[]>([]);
+  
+  // 외부 상태가 있으면 사용하고, 없으면 내부 상태 사용 (하위 호환성)
+  const [internalGeneratedScript, setInternalGeneratedScript] = useState<ScriptPanel[]>([]);
+  const [internalEditedScript, setInternalEditedScript] = useState<ScriptPanel[]>([]);
+  
+  const generatedScript = externalGeneratedScript ?? internalGeneratedScript;
+  const setGeneratedScript = setExternalGeneratedScript ?? setInternalGeneratedScript;
+  const editedScript = externalEditedScript ?? internalEditedScript;
+  const setEditedScript = setExternalEditedScript ?? setInternalEditedScript;
   const [loading, setLoading] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -73,11 +105,23 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
     { value: '8-10', label: '8-10', description: '긴 스토리' }
   ] as const;
 
+  // 🚀 선택된 캐릭터/요소가 실제로 변경되었을 때만 로드 (무한 루프 방지)
+  const currentCharacterIds = selectedCharacters.join(',');
+  const currentElementIds = selectedElements.join(',');
+  
   useEffect(() => {
-    loadCharactersAndElements();
-  }, []);
+    // 선택된 항목이 있을 때만 로드
+    if (currentCharacterIds || currentElementIds) {
+      loadCharactersAndElements();
+    }
+  }, [currentCharacterIds, currentElementIds]); // 문자열 비교로 실제 변경만 감지
 
-  const loadCharactersAndElements = async () => {
+  // 생성된 대본이 변경되면 편집 가능한 대본도 업데이트
+  useEffect(() => {
+    setEditedScript(generatedScript);
+  }, [generatedScript]);
+
+  const loadCharactersAndElements = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -92,42 +136,66 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
 
       if (!userData) return;
 
-      // 캐릭터와 요소를 병렬로 로드
-      const [charactersResult, elementsResult] = await Promise.all([
-        supabase
-          .from('character')
-          .select('id, name, description, thumbnailUrl')
-          .eq('userId', userData.id)
-          .order('createdAt', { ascending: false }),
-        supabase
-          .from('element')
-          .select('id, name, description, category, thumbnailUrl')
-          .eq('userId', userData.id)
-          .order('createdAt', { ascending: false })
-      ]);
+      // 선택된 캐릭터와 요소 정보만 로드 (성능 최적화)
+      const loadPromises = [];
+      
+      if (selectedCharacters.length > 0) {
+        loadPromises.push(
+          supabase
+            .from('character')
+            .select('id, name, description, thumbnailUrl')
+            .eq('userId', userData.id)
+            .in('id', selectedCharacters)
+        );
+      } else {
+        loadPromises.push(Promise.resolve({ data: [] }));
+      }
+      
+      if (selectedElements.length > 0) {
+        loadPromises.push(
+          supabase
+            .from('element')
+            .select('id, name, description, category, thumbnailUrl')
+            .eq('userId', userData.id)
+            .in('id', selectedElements)
+        );
+      } else {
+        loadPromises.push(Promise.resolve({ data: [] }));
+      }
+
+      const [charactersResult, elementsResult] = await Promise.all(loadPromises);
 
       setCharacters(charactersResult.data || []);
       setElements(elementsResult.data || []);
+      
+      console.log('📋 선택된 캐릭터 정보 로드:', charactersResult.data?.length || 0, '개');
+      console.log('📋 선택된 요소 정보 로드:', elementsResult.data?.length || 0, '개');
     } catch (error) {
       console.error('캐릭터/요소 로딩 실패:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // 의존성 없음 - 함수 내에서 props 직접 사용
 
-  const handleCharacterToggle = (characterId: string) => {
-    setSelectedCharacters(prev => 
-      prev.includes(characterId)
-        ? prev.filter(id => id !== characterId)
-        : [...prev, characterId]
+  // 🚀 캐릭터/요소 토글 기능 제거 - 외부에서 관리됨
+  // const handleCharacterToggle = ...
+  // const handleElementToggle = ...
+
+  // 편집된 대본의 프롬프트 수정
+  const handlePromptEdit = (index: number, newPrompt: string) => {
+    setEditedScript(prev => 
+      prev.map((panel, i) => 
+        i === index ? { ...panel, prompt: newPrompt } : panel
+      )
     );
   };
 
-  const handleElementToggle = (elementId: string) => {
-    setSelectedElements(prev => 
-      prev.includes(elementId)
-        ? prev.filter(id => id !== elementId)
-        : [...prev, elementId]
+  // 편집된 대본의 캐릭터 수정
+  const handleCharacterEdit = (index: number, newCharacters: string[]) => {
+    setEditedScript(prev => 
+      prev.map((panel, i) => 
+        i === index ? { ...panel, characters: newCharacters } : panel
+      )
     );
   };
 
@@ -137,10 +205,16 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
       return;
     }
 
+    // 🚀 캐릭터나 요소가 선택되지 않으면 안내 메시지
+    if (selectedCharacters.length === 0 && selectedElements.length === 0) {
+      alert('위쪽에서 캐릭터나 요소를 먼저 선택해주세요');
+      return;
+    }
+
     setIsGenerating(true);
     
     try {
-      // 선택된 캐릭터와 요소 정보 수집
+      // 🚀 외부에서 선택된 캐릭터와 요소 정보 사용
       const characterNames = selectedCharacters.map(id => {
         const char = characters.find(c => c.id === id);
         return char?.name || '';
@@ -150,6 +224,13 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
         const element = elements.find(e => e.id === id);
         return element ? `${element.name} (${element.description})` : '';
       }).filter(Boolean);
+      
+      console.log('🎭 대본 생성 요청:', {
+        characterNames,
+        elementNames,
+        selectedCharacterIds: selectedCharacters,
+        selectedElementIds: selectedElements
+      });
 
       const panelCount = selectedPanelCount === '3-5' ? 4 : 
                         selectedPanelCount === '6-8' ? 7 : 9;
@@ -163,7 +244,9 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
         body: JSON.stringify({
           storyPrompt: storyPrompt.trim(),
           characterNames,
+          selectedCharacterIds: selectedCharacters, // 🎭 실제 선택된 캐릭터 ID들 추가
           elementNames,
+          selectedElementIds: selectedElements, // 🎯 실제 선택된 요소 ID들 추가
           panelCount,
           style: 'webtoon'
         })
@@ -175,7 +258,7 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
       }
 
       const result = await response.json();
-      setGeneratedScript(result.panels);
+      setGeneratedScript(result.data?.panels || []);
       
     } catch (error) {
       console.error('대본 생성 실패:', error);
@@ -191,8 +274,81 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const useGeneratedScript = () => {
-    onScriptGenerated(generatedScript);
+  const generateAndCreateBatch = async () => {
+    // 🚀 1단계: 먼저 대본 생성 확인
+    if (!storyPrompt.trim()) {
+      alert('스토리 아이디어를 입력해주세요');
+      return;
+    }
+
+    if (selectedCharacters.length === 0 && selectedElements.length === 0) {
+      alert('위쪽에서 캐릭터나 요소를 먼저 선택해주세요');
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      let scriptToUse = editedScript;
+      
+      // 🚀 2단계: 대본이 없으면 먼저 생성
+      if (generatedScript.length === 0) {
+        console.log('📝 대본이 없어서 먼저 생성합니다...');
+        
+        // 대본 생성 API 직접 호출하여 결과를 바로 받기
+        const response = await fetch('/api/ai/generate-script', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            storyPrompt: storyPrompt.trim(),
+            characterNames: selectedCharacters.map(id => {
+              const char = characters.find(c => c.id === id);
+              return char?.name || '';
+            }).filter(Boolean),
+            selectedCharacterIds: selectedCharacters,
+            elementNames: selectedElements.map(id => {
+              const element = elements.find(e => e.id === id);
+              return element ? `${element.name} (${element.description})` : '';
+            }).filter(Boolean),
+            selectedElementIds: selectedElements,
+            panelCount: selectedPanelCount === '3-5' ? 4 : 
+                       selectedPanelCount === '6-8' ? 7 : 9,
+            style: 'webtoon'
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '대본 생성 실패');
+        }
+
+        const result = await response.json();
+        const newScript = result.data?.panels || [];
+        
+        // 대본 생성 실패 시 중단
+        if (newScript.length === 0) {
+          alert('대본 생성에 실패했습니다. 다시 시도해주세요.');
+          return;
+        }
+        
+        // 🚀 State 업데이트와 동시에 로컬 변수도 업데이트
+        setGeneratedScript(newScript);
+        scriptToUse = newScript;
+        console.log('📝 새로 생성된 대본:', newScript);
+      }
+
+      // 🚀 3단계: 생성된 대본으로 바로 배치 생성 호출
+      console.log('🚀 배치 생성 시작 - 사용할 대본:', scriptToUse);
+      onScriptGenerated(scriptToUse);
+      
+    } catch (error) {
+      console.error('❌ 대본 생성 및 배치 생성 오류:', error);
+      alert('대본 생성 및 배치 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (loading) {
@@ -263,95 +419,50 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
           </div>
         </div>
 
-        {/* 캐릭터 선택 */}
+        {/* 선택된 캐릭터 & 요소 정보 표시 */}
         <div className="space-y-3">
           <label className="text-sm font-medium text-gray-700">
-            등장 캐릭터 (선택사항)
+            선택된 캐릭터 & 요소
           </label>
-          {characters.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 bg-gray-50 rounded-lg">
-              <User className="h-6 w-6 mx-auto mb-2" />
-              <p className="text-sm">등록된 캐릭터가 없습니다</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {characters.map((character) => (
-                <div
-                  key={character.id}
-                  className={cn(
-                    "flex items-center gap-3 p-2 border rounded-lg cursor-pointer transition-all",
-                    selectedCharacters.includes(character.id)
-                      ? "border-purple-300 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  )}
-                  onClick={() => handleCharacterToggle(character.id)}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={character.thumbnailUrl} alt={character.name} />
-                    <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">
-                      {character.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{character.name}</div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {character.description}
-                    </div>
-                  </div>
-                  {selectedCharacters.includes(character.id) && (
-                    <Check className="h-4 w-4 text-purple-600" />
-                  )}
+          <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+            {/* 선택된 캐릭터 */}
+            <div>
+              <div className="text-xs font-medium text-purple-700 mb-2 flex items-center gap-1">
+                <User className="h-3 w-3" />
+                캐릭터 ({selectedCharacters.length}개)
+              </div>
+              {selectedCharacters.length === 0 ? (
+                <p className="text-xs text-gray-500">위쪽에서 캐릭터를 선택해주세요</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {characters.map((character) => (
+                    <Badge key={character.id} variant="secondary" className="bg-purple-100 text-purple-700 text-xs">
+                      {character.name}
+                    </Badge>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-
-        {/* 요소 선택 - 🚨 FORCED VISIBLE FOR DEBUGGING */}
-        <div className="space-y-3" style={{backgroundColor: '#ffeb3b', padding: '10px', border: '2px solid red'}}>
-          <label className="text-sm font-medium text-gray-700">
-            🎯 등장 요소 (선택사항) - Elements: {elements.length}
-          </label>
-          {elements.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 bg-gray-50 rounded-lg">
-              <FileText className="h-6 w-6 mx-auto mb-2" />
-              <p className="text-sm">등록된 요소가 없습니다 (개발 모드: 강제 표시)</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {elements.map((element) => (
-                <div
-                  key={element.id}
-                  className={cn(
-                    "flex items-center gap-3 p-2 border rounded-lg cursor-pointer transition-all",
-                    selectedElements.includes(element.id)
-                      ? "border-green-300 bg-green-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  )}
-                  onClick={() => handleElementToggle(element.id)}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={element.thumbnailUrl} alt={element.name} />
-                    <AvatarFallback className="bg-green-100 text-green-700 text-xs">
-                      {element.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{element.name}</div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {element.description}
-                    </div>
-                    <div className="text-xs text-blue-600 font-medium">
-                      {element.category}
-                    </div>
-                  </div>
-                  {selectedElements.includes(element.id) && (
-                    <Check className="h-4 w-4 text-green-600" />
-                  )}
+            
+            {/* 선택된 요소 */}
+            <div>
+              <div className="text-xs font-medium text-green-700 mb-2 flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                요소 ({selectedElements.length}개)
+              </div>
+              {selectedElements.length === 0 ? (
+                <p className="text-xs text-gray-500">위쪽에서 요소를 선택해주세요</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {elements.map((element) => (
+                    <Badge key={element.id} variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                      {element.name}
+                    </Badge>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* 생성 버튼 */}
@@ -374,33 +485,34 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
         </Button>
 
         {/* 생성된 대본 결과 */}
-        {generatedScript.length > 0 && (
+        {editedScript.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">생성된 대본</h3>
+              <h3 className="text-lg font-semibold text-gray-800">대본 편집</h3>
               <div className="flex gap-2">
                 <Button
-                  onClick={() => onApplyToCanvas?.(generatedScript)}
+                  onClick={generateAndCreateBatch}
                   size="sm"
-                  variant="outline"
-                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  패널에 적용하기
-                </Button>
-                <Button
-                  onClick={useGeneratedScript}
-                  size="sm"
+                  disabled={isGenerating}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  <Zap className="h-4 w-4 mr-2" />
-                  한꺼번에 생성하기
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      대본 만들고 배치 생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      대본 만들고 바로 배치 생성
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
             
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {generatedScript.map((panel, index) => (
+              {editedScript.map((panel, index) => (
                 <div
                   key={index}
                   className="bg-gray-50 border rounded-lg p-4"
@@ -422,9 +534,12 @@ export function AIScriptGenerator({ onScriptGenerated, onApplyToCanvas, classNam
                     </Button>
                   </div>
                   
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {panel.prompt}
-                  </p>
+                  <Textarea
+                    value={panel.prompt}
+                    onChange={(e) => handlePromptEdit(index, e.target.value)}
+                    className="text-sm leading-relaxed min-h-[80px] resize-none"
+                    placeholder="프롬프트를 입력하세요..."
+                  />
                   
                   {(panel.characters.length > 0 || panel.elements?.length > 0) && (
                     <div className="flex flex-wrap gap-1 mt-2">

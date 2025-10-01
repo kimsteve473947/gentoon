@@ -111,10 +111,12 @@ npx tsx <script>        # Run TypeScript files directly
 - Virtualized lists and lazy loading for large datasets
 
 #### AI Integration
-- **Image Generation**: `/api/ai/generate`
+- **Image Generation**: `/api/ai/generate` (single panel) and `/api/ai/generate-batch` (multiple panels)
 - **Script Generation**: `/api/ai/generate-script`
-- Uses Google Vertex AI (Gemini 2.5 Flash Image Preview)
-- Character consistency through ratio-specific reference images
+- Uses Google Vertex AI (Gemini 2.5 Flash Image Preview) with @google/genai SDK
+- **Character Consistency**: Ratio-specific reference images with 3-image multimodal limit
+- **Multi-Character Support**: Enhanced prompts for balanced representation of multiple characters
+- **Panel Continuity**: `editImageNanoBananaMCP` method for consistent panel-to-panel transitions
 - AI script-based automatic character selection system
 - Token-based usage tracking with real-time balance monitoring
 - Development mode saves to localStorage for testing
@@ -182,11 +184,12 @@ Recent optimizations implemented:
 - **Panel Mapping**: `Map<panelIndex, characterIds[]>` for efficient panel-character relationships
 - **Auto-Selection UI**: Visual indicators when characters are auto-selected vs manually selected
 
-### Ratio-Specific Character References
-- **1:1 Canvas**: Uses square ratio character images only
-- **4:5 Canvas**: Uses portrait ratio character images only
-- **Optimization**: Sends only 1 relevant reference image per character instead of all 3
-- **Performance**: Reduces multimodal prompt payload and improves generation speed
+### Character Reference System & Multimodal AI
+- **Ratio-Specific References**: 1:1 canvas uses square images, 4:5 canvas uses portrait images
+- **Multimodal Limits**: Maximum 3 reference images per AI generation (Vertex AI constraint)
+- **Character Distribution**: 1 reference image per character, supports up to 3 characters simultaneously
+- **Smart Selection**: Automatically selects best ratio-specific image for each character
+- **Multi-Character Consistency**: Enhanced prompts ensure all characters appear with equal attention and accurate representation
 
 ### Prompt Engineering System
 - **Template-Based**: Different prompt templates for 1:1 vs 4:5 aspect ratios
@@ -220,6 +223,9 @@ If Prisma can't connect to Supabase:
 - Check GOOGLE_AI_API_KEY is valid
 - Verify token balance for user
 - In dev mode, check localStorage for cached images
+- **Character Issues**: If characters aren't appearing correctly, check reference image limits (max 3)
+- **Multi-Character Problems**: Verify enhanced multi-character prompts are being used
+- **EditMode Failures**: Ensure `editImageNanoBananaMCP` is called with proper previous image reference
 
 #### Build Errors
 - Clear `.next` directory: `rm -rf .next` or `npm run clear-cache`
@@ -245,6 +251,9 @@ If Prisma can't connect to Supabase:
 - In development mode, bypass authentication but still track token usage
 - Character auto-selection should work seamlessly with AI script generation
 - Ensure ratio-specific character reference images are sent correctly
+- **Multimodal Constraints**: Respect 3-image limit for Vertex AI multimodal prompts
+- **Character Balance**: Use enhanced prompts for multi-character scenarios to ensure equal representation
+- **nanobananaMCP Method**: Use `editImageNanoBananaMCP` for panel-to-panel continuity editing
 
 ### Performance
 - Use React.memo, useMemo, and useCallback for performance-critical components

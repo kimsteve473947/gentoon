@@ -68,14 +68,9 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     let referenceImages: string[] = [];
     let characterDescriptions = "";
 
-    if (editMode && referenceImage) {
-      // 수정 모드일 때는 생성된 이미지만 레퍼런스로 사용
-      console.log('✏️ 수정 모드: 생성된 이미지만 레퍼런스로 사용 (캐릭터 정보 제외)');
-      referenceImages = [referenceImage];
-      enhancedPrompt = `[IMAGE EDIT MODE] Based on the provided reference image, make the following changes: ${prompt}`;
-    } else if (characterIds && characterIds.length > 0) {
-      // 일반 생성 모드일 때만 캐릭터 레퍼런스 처리
-      console.log('📝 일반 생성 모드 - 캐릭터 ID들:', characterIds);
+    // 🎭 캐릭터 레퍼런스 처리 (editMode에서도 필요)
+    if (characterIds && characterIds.length > 0) {
+      console.log('🎭 캐릭터 레퍼런스 처리 - 캐릭터 ID들:', characterIds);
       
       try {
         // 선택된 캐릭터들로 프롬프트 향상 (프로젝트 비율 전달)
@@ -98,24 +93,59 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       }
     }
 
-    // 큐를 통한 이미지 생성 (병렬 처리 안전)
-    console.log(`🎯 큐에 생성 요청 추가: panelId=${panelId}, userId=${userId}`);
+    // 🔄 편집 모드 프롬프트 설정
+    if (editMode && referenceImage) {
+      console.log('✏️ 편집 모드: 이전 이미지를 참조하여 다음 패널 생성');
+      enhancedPrompt = `[IMAGE EDIT MODE] Based on the provided reference image, make the following changes: ${prompt}`;
+    }
+
+    let result;
     
-    const result = await generationQueue.enqueue(
-      userId,
-      enhancedPrompt,
-      {
-        selectedCharacterIds: characterIds,
-        referenceImages: referenceImages,
-        elementImageUrls: elementImageUrls, // ✨ 저장된 요소 이미지 URL들
-        characterDescriptions: new Map(characterIds?.map((id: string) => [id, characterDescriptions]) || []),
-        aspectRatio: ratio,
-        width: width,
-        height: height
-      },
-      panelId, // 패널별 중복 방지용
-      panelId ? 5 : 0 // 패널 업데이트는 높은 우선순위
-    );
+    if (editMode && referenceImage) {
+      // 🚀 나노바나나MCP 편집 모드: editImageNanoBananaMCP 직접 호출
+      console.log(`🔄 나노바나나MCP 편집 모드: panelId=${panelId}, userId=${userId}`);
+      console.log(`📸 이전 이미지: ${referenceImage.substring(0, 50)}...`);
+      
+      // nanoBananaService에서 직접 editImageNanoBananaMCP 호출
+      const { nanoBananaService } = await import('@/lib/ai/nano-banana-service');
+      
+      // 캐릭터 레퍼런스 준비 (편집 모드에서도 캐릭터 일관성 유지)
+      const characterReferences = referenceImages.map(url => ({ imageUrl: url }));
+      
+      result = await nanoBananaService.editImageNanoBananaMCP(
+        referenceImage,
+        enhancedPrompt, // 향상된 프롬프트 사용 (요소 정보 포함)
+        characterReferences,
+        ratio as '4:5' | '1:1',
+        {
+          userId: userId,
+          panelId: parseInt(panelId) || undefined,
+          sessionId: `batch-edit-${Date.now()}`,
+          elementImageUrls: elementImageUrls // 요소 이미지 URL들 전달
+        }
+      );
+      
+      console.log(`✅ 나노바나나MCP 편집 완료: tokensUsed=${result.tokensUsed}`);
+    } else {
+      // 🆕 일반 생성 모드: 기존 큐 시스템 사용
+      console.log(`🎯 큐에 생성 요청 추가: panelId=${panelId}, userId=${userId}`);
+      
+      result = await generationQueue.enqueue(
+        userId,
+        enhancedPrompt,
+        {
+          selectedCharacterIds: characterIds,
+          referenceImages: referenceImages,
+          elementImageUrls: elementImageUrls, // ✨ 저장된 요소 이미지 URL들
+          characterDescriptions: new Map(characterIds?.map((id: string) => [id, characterDescriptions]) || []),
+          aspectRatio: ratio,
+          width: width,
+          height: height
+        },
+        panelId, // 패널별 중복 방지용
+        panelId ? 5 : 0 // 패널 업데이트는 높은 우선순위
+      );
+    }
 
     // Google Gemini API 실제 토큰 사용량을 기반으로 사용자 토큰 차감
     console.log(`🔢 실제 Gemini API 토큰 사용량: ${result.tokensUsed}`);
@@ -141,12 +171,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       userId: userId,
       imageUrl: result.imageUrl,
       thumbnailUrl: result.thumbnailUrl,
-      tokensUsed: result.tokensUsed,
+      // tokensUsed: result.tokensUsed, // 임시 제거 - Supabase 스키마에 없음
       prompt: prompt,
-      projectId: projectId,
-      panelId: panelId,
-      aspectRatio: ratio,
-      createdAt: new Date().toISOString()
+      projectId: projectId
+      // panelId 제거 - UUID 타입 오류 방지 (숫자 0,1,2,3 대신 UUID 필요)
+      // aspectRatio 제거 - Prisma 스키마에 없음
+      // createdAt 제거 - 자동 설정됨
     };
 
     const { data: savedGeneration, error: insertError } = await supabase
@@ -161,21 +191,20 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } else {
       console.log('💾 생성 기록 저장 완료:', savedGeneration.id);
       
-      // 🔗 패널의 generationId 연결
-      if (panelId && savedGeneration?.id) {
+      // 🔗 패널 이미지 URL 업데이트 (panelId는 order 번호이므로 order로 업데이트)
+      if (panelId !== undefined && projectId && savedGeneration?.id) {
         const { error: updateError } = await supabase
           .from('panel')
           .update({
-            generationId: savedGeneration.id,
-            imageUrl: result.imageUrl,
-            updatedAt: new Date().toISOString()
+            imageUrl: result.imageUrl
           })
-          .eq('id', panelId);
+          .eq('projectId', projectId)
+          .eq('"order"', parseInt(panelId));
         
         if (updateError) {
           console.error('❌ 패널 업데이트 실패:', updateError);
         } else {
-          console.log('✅ 패널 연결 완료:', panelId, '→', savedGeneration.id);
+          console.log('✅ 패널 이미지 업데이트 완료:', panelId);
         }
       }
     }

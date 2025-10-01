@@ -790,22 +790,33 @@ export default function InquiriesAdminPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {selectedInquiry.attachments.map((attachment: string, index: number) => {
-                        const fileName = attachment.split('/').pop() || `첨부파일_${index + 1}`;
-                        const isImage = attachment.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+                      {selectedInquiry.attachments.map((attachment: any, index: number) => {
+                        // 새로운 구조: {url, name, size, type} 객체 또는 기존 문자열 URL 지원
+                        const attachmentUrl = typeof attachment === 'string' ? attachment : attachment.url;
+                        const fileName = typeof attachment === 'string' 
+                          ? attachment.split('/').pop() || `첨부파일_${index + 1}`
+                          : attachment.name || `첨부파일_${index + 1}`;
+                        const fileSize = typeof attachment === 'string' ? null : attachment.size;
+                        const fileType = typeof attachment === 'string' ? null : attachment.type;
+                        
+                        const isImage = attachmentUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) || 
+                                       (fileType && fileType.startsWith('image/'));
                         
                         return (
                           <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
                             {isImage ? (
                               <div className="flex items-center gap-3">
                                 <img 
-                                  src={attachment} 
+                                  src={attachmentUrl} 
                                   alt={`첨부파일 ${index + 1}`}
                                   className="w-12 h-12 object-cover rounded border"
                                 />
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium text-gray-900 truncate">{fileName}</p>
-                                  <p className="text-xs text-gray-500">이미지 파일</p>
+                                  <p className="text-xs text-gray-500">
+                                    이미지 파일
+                                    {fileSize && ` • ${(fileSize / 1024).toFixed(1)}KB`}
+                                  </p>
                                 </div>
                               </div>
                             ) : (
@@ -815,7 +826,10 @@ export default function InquiriesAdminPage() {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium text-gray-900 truncate">{fileName}</p>
-                                  <p className="text-xs text-gray-500">파일</p>
+                                  <p className="text-xs text-gray-500">
+                                    {fileType || '파일'}
+                                    {fileSize && ` • ${(fileSize / 1024).toFixed(1)}KB`}
+                                  </p>
                                 </div>
                               </div>
                             )}
@@ -826,7 +840,7 @@ export default function InquiriesAdminPage() {
                               className="ml-auto"
                             >
                               <a 
-                                href={attachment} 
+                                href={attachmentUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1"

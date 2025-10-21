@@ -142,10 +142,21 @@ npx tsx <script>        # Run TypeScript files directly
 Required in `.env.local`:
 ```env
 # Google Vertex AI
-GOOGLE_AI_API_KEY=
 GOOGLE_CLOUD_PROJECT_ID=
 GOOGLE_CLOUD_LOCATION=global
+
+# Local Development (file path)
 GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+
+# Vercel Production (individual environment variables - recommended)
+GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...your-private-key...\n-----END PRIVATE KEY-----\n"
+GOOGLE_PRIVATE_KEY_ID=your-private-key-id
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/...
+
+# Backup JSON method (for compatibility)
+GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account",...}
 
 # Supabase
 DATABASE_URL=postgresql://...

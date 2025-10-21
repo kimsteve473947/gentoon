@@ -32,11 +32,32 @@ export class NanoBananaService {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
     }
 
-    // 서비스 계정 credentials 직접 로드
+    // 서비스 계정 credentials 구성
     let credentials = null;
     
-    // 로컬 환경에서 파일 직접 읽기
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // 1. 환경변수로 개별 값 사용 (Vercel 권장 방식)
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      try {
+        credentials = {
+          type: "service_account",
+          project_id: process.env.GOOGLE_CLOUD_PROJECT_ID || projectId,
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: "https://accounts.google.com/o/oauth2/auth",
+          token_uri: "https://oauth2.googleapis.com/token",
+          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL
+        };
+        console.log('✅ 환경변수에서 Vertex AI credentials 구성 성공');
+      } catch (error) {
+        console.error('❌ 환경변수 credentials 구성 실패:', error);
+      }
+    }
+    
+    // 2. 로컬 환경에서 파일 직접 읽기 (개발용)
+    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       try {
         const fs = require('fs');
         const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -45,7 +66,7 @@ export class NanoBananaService {
         if (fs.existsSync(credentialsPath)) {
           const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
           credentials = JSON.parse(credentialsContent);
-          console.log('✅ Vertex AI credentials 로드 성공');
+          console.log('✅ 로컬 파일에서 Vertex AI credentials 로드 성공');
         } else {
           console.error('❌ Credentials 파일 없음:', credentialsPath);
         }
@@ -54,22 +75,19 @@ export class NanoBananaService {
       }
     }
     
-    // Vercel 환경에서 JSON 환경변수 사용
+    // 3. Vercel JSON 환경변수 사용 (백업 방식)
     if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
       try {
-        // Vercel 환경변수에서 발생할 수 있는 개행문자 제거
         const cleanJsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
         credentials = JSON.parse(cleanJsonString);
         
-        // private_key에서 \\n을 실제 개행으로 변환
         if (credentials.private_key) {
           credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
         }
         
-        console.log('✅ Vercel 환경변수에서 credentials 로드 성공');
+        console.log('✅ JSON 환경변수에서 credentials 로드 성공');
       } catch (error) {
-        console.error('❌ Vercel credentials JSON 파싱 실패:', error);
-        console.error('JSON 문자열 길이:', process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON?.length);
+        console.error('❌ JSON credentials 파싱 실패:', error);
       }
     }
     
@@ -787,7 +805,7 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
             return {
               imageUrl: `data:image/webp;base64,${webpResult.optimizedData}`,
               thumbnailUrl: `data:image/webp;base64,${responsiveSizes.thumbnailBase64}`,
-              originalSize: originalImageSize,
+              originalSize: webpResult.originalSize || 0,
               optimizedSize: webpResult.optimizedSize,
               thumbnailSize: responsiveSizes.thumbnailSize
             };
@@ -880,33 +898,41 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
       
       // 텍스트 프롬프트 추가
       if (referenceImages.length > 0) {
-        // 🔧 개선된 멀티캐릭터 일관성 프롬프트
+        // 🔧 더욱 강화된 멀티캐릭터 일관성 프롬프트
         const characterCount = referenceImages.length;
         const characterText = characterCount === 1 ? "character" : `${characterCount} characters`;
         
         parts.push({
-          text: `Generate the following scene with ${characterText} from the reference images: ${textPrompt}
+          text: `${textPrompt}
 
-🎯 MULTI-CHARACTER CONSISTENCY REQUIREMENTS:
-- There are ${characterCount} reference image(s) showing different characters
-- EACH character must maintain their EXACT appearance from their respective reference image
-- Preserve ALL unique features: facial structure, hair, clothing, body proportions
-- Ensure ALL characters appear clearly and recognizably in the scene
-- Distribute attention equally among all ${characterCount} character(s)
-- Keep each character's distinct visual identity while placing them in the new scene
+🎯 CRITICAL MULTI-CHARACTER REQUIREMENTS:
+Look at the ${characterCount} reference images provided. Each image shows a DIFFERENT character that MUST appear in this scene.
 
-🚨 CRITICAL: Every character from the reference images must be accurately represented`
+📸 CHARACTER CONSISTENCY RULES:
+- Reference Image 1: Copy this character's EXACT appearance (face, hair, clothing, body)
+- Reference Image 2: Copy this character's EXACT appearance (face, hair, clothing, body)
+${characterCount > 2 ? '- Reference Image 3: Copy this character\'s EXACT appearance (face, hair, clothing, body)' : ''}
+
+🚨 MANDATORY REQUIREMENTS:
+- BOTH/ALL characters from the reference images MUST be visible in the final image
+- Each character must look IDENTICAL to their reference image
+- Use the EXACT hairstyle, face shape, clothing, and colors from each reference
+- Do NOT merge or blend characters - keep them as SEPARATE individuals
+- Each character should be clearly distinguishable and recognizable
+
+✅ SUCCESS CRITERIA: I should be able to point to each character in the final image and match them perfectly to their reference images.`
         });
         
-        // 레퍼런스 이미지들 추가
-        for (const refImage of referenceImages) {
+        // 레퍼런스 이미지들 순서대로 추가
+        referenceImages.forEach((refImage, index) => {
           parts.push({
             inlineData: {
               mimeType: refImage.inlineData.mimeType,
               data: refImage.inlineData.data
             }
           });
-        }
+          console.log(`📸 Reference Image ${index + 1}: ${refImage.inlineData.mimeType}, ${Math.round(refImage.inlineData.data.length/1024)}KB`);
+        });
         
         console.log(`📸 멀티캐릭터 레퍼런스 ${referenceImages.length}개를 균등하게 참조하도록 프롬프트 개선`);
       } else {

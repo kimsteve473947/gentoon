@@ -49,8 +49,8 @@ export async function POST(
       return ApiResponse.badRequest("이미 진행 중인 작업입니다");
     }
     
-    // 토큰 잔액 확인
-    const requiredTokens = (job.total_panels - job.completed_panels) * 2000;
+    // 토큰 잔액 확인 (nanoBananaService는 1290 토큰 사용)
+    const requiredTokens = (job.total_panels - job.completed_panels) * 1290;
     const balance = await tokenManager.getImageGenerationBalance(user.id);
     
     if (balance.remainingTokens < requiredTokens) {
@@ -126,119 +126,252 @@ async function processBatchJobAsync(jobId: string, userId: string) {
     let totalTokensUsed = 0;
     let completedCount = 0;
     
-    // 각 패널 순차 처리
-    for (const panel of pendingPanels) {
-      try {
-        // 패널 상태를 'in_progress'로 업데이트
-        await supabase
-          .from('batch_panel_result')
-          .update({
-            status: 'in_progress',
-            started_at: new Date().toISOString()
-          })
-          .eq('id', panel.id);
-        
-        // 전체 작업 진행 상황 업데이트
-        await supabase
-          .from('batch_generation_job')
-          .update({
-            current_panel_index: panel.panel_order - 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-        
-        // 캐릭터 레퍼런스 수집
-        const characterReferences = panel.characters
-          .map((charName: string) => {
+    // 🚀 연속성 있는 배치 생성을 위해 generate-batch API 사용
+    try {
+      // 작업 정보 조회
+      const { data: jobData } = await supabase
+        .from('batch_generation_job')
+        .select('canvas_ratio, project_id')
+        .eq('id', jobId)
+        .single();
+      
+      if (!jobData) {
+        throw new Error('배치 작업 정보를 찾을 수 없습니다');
+      }
+
+      // 패널 데이터를 generate-batch API 형식으로 변환
+      const panels = pendingPanels.map(panel => ({
+        order: panel.panel_order,
+        prompt: panel.prompt,
+        characters: Array.isArray(panel.characters) ? panel.characters : [],
+        elements: Array.isArray(panel.elements) ? panel.elements : []
+      }));
+
+      // 캐릭터 ID 수집 (이름 -> ID 변환)
+      const selectedCharacters = [...new Set(
+        panels.flatMap(p => p.characters)
+          .map(charName => {
             const character = characters.find(c => c.name === charName);
-            if (!character) return null;
-            
-            // 비율에 따른 이미지 선택 로직 필요
+            return character?.id;
+          })
+          .filter(Boolean)
+      )];
+
+      // 요소 데이터 변환
+      const selectedElements = [...new Set(
+        panels.flatMap(p => p.elements)
+          .map(elementName => {
+            const element = elements.find(e => e.name === elementName);
+            if (!element) return null;
             return {
-              name: character.name,
-              description: character.description,
-              imageUrl: character.thumbnailUrl
+              id: element.id,
+              name: element.name,
+              description: element.description,
+              category: element.category,
+              thumbnailUrl: element.thumbnailUrl,
+              isSelected: true
             };
           })
-          .filter(Boolean);
-        
-        // AI 이미지 생성
-        const { data: job } = await supabase
-          .from('batch_generation_job')
-          .select('canvas_ratio')
-          .eq('id', jobId)
-          .single();
-          
-        const response = await nanoBananaService.generateImage(
-          panel.prompt,
-          job?.canvas_ratio || '4:5',
-          characterReferences,
-          {
-            requestType: 'batch_generation',
-            panelIndex: panel.panel_order,
-            totalPanels: pendingPanels.length
+          .filter(Boolean)
+      )];
+
+      console.log(`🚀 연속성 배치 생성 시작: ${panels.length}개 패널, 캐릭터: ${selectedCharacters.length}개, 요소: ${selectedElements.length}개`);
+
+      // 🔗 editImageNanoBananaMCP를 사용한 연속성 배치 생성
+      const results = [];
+      let successCount = 0;
+      let failCount = 0;
+      let previousImageUrl: string | null = null;
+
+      // 캐릭터 레퍼런스 준비 (characterReferenceManager 방식)
+      const { characterReferenceManager } = await import('@/lib/ai/character-reference-manager');
+      let referenceImages: string[] = [];
+
+      if (selectedCharacters.length > 0) {
+        try {
+          const promptEnhancement = await characterReferenceManager.enhancePromptWithSelectedCharacters(
+            userId,
+            "웹툰 이미지 생성",
+            selectedCharacters,
+            jobData.canvas_ratio as '4:5' | '1:1'
+          );
+          referenceImages = promptEnhancement.referenceImages;
+          console.log(`✅ 캐릭터 레퍼런스 로딩: ${referenceImages.length}개`);
+        } catch (error) {
+          console.warn('캐릭터 레퍼런스 로딩 실패:', error);
+        }
+      }
+
+      // 요소 이미지 URL 준비
+      const elementImageUrls = selectedElements
+        .filter(element => element.isSelected && element.thumbnailUrl)
+        .map(element => element.thumbnailUrl!)
+        .filter(Boolean);
+
+      // 패널 순차 처리 (연속성 있게)
+      for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        const panelId = panel.order.toString();
+
+        try {
+          console.log(`⚡ 배치 ${i + 1}/${panels.length} 패널 생성 중...`);
+
+          let result;
+
+          if (i === 0) {
+            // 첫 번째 패널: 일반 생성
+            result = await nanoBananaService.generateWebtoonPanel(
+              panel.prompt,
+              {
+                userId: userId,
+                projectId: jobData.project_id,
+                panelId: parseInt(panelId),
+                sessionId: `batch-${jobId}`,
+                aspectRatio: jobData.canvas_ratio as '4:5' | '1:1',
+                referenceImages: referenceImages,
+                elementImageUrls: elementImageUrls
+              }
+            );
+          } else {
+            // 두 번째부터: editImageNanoBananaMCP 사용 (연속성)
+            const characterReferences = referenceImages.map(url => ({ imageUrl: url }));
+
+            result = await nanoBananaService.editImageNanoBananaMCP(
+              previousImageUrl!,
+              panel.prompt,
+              characterReferences,
+              jobData.canvas_ratio as '4:5' | '1:1',
+              {
+                userId: userId,
+                panelId: parseInt(panelId),
+                sessionId: `batch-${jobId}`,
+                elementImageUrls: elementImageUrls
+              }
+            );
           }
-        );
+
+          if (result?.imageUrl) {
+            successCount++;
+            results.push({
+              panelIndex: i,
+              panelId: panelId,
+              success: true,
+              imageUrl: result.imageUrl,
+              generationId: `batch-${jobId}-${panelId}`,
+              tokensUsed: result.tokensUsed || 1290
+            });
+
+            previousImageUrl = result.imageUrl;
+            console.log(`✅ 배치 ${i + 1}/${panels.length} 패널 완료`);
+          } else {
+            failCount++;
+            results.push({
+              panelIndex: i,
+              panelId: panelId,
+              success: false,
+              error: '이미지 생성 실패'
+            });
+          }
+
+          // 패널 간 대기
+          if (i < panels.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+        } catch (error) {
+          failCount++;
+          console.error(`❌ 배치 ${i + 1}/${panels.length} 패널 오류:`, error);
+          
+          results.push({
+            panelIndex: i,
+            panelId: panelId,
+            success: false,
+            error: error instanceof Error ? error.message : '알 수 없는 오류'
+          });
+        }
+      }
+
+      const batchResult = {
+        success: true,
+        data: {
+          totalPanels: panels.length,
+          successCount,
+          failCount,
+          results,
+          tokensUsed: successCount * 1290
+        }
+      };
+
+      console.log(`🎉 연속성 배치 생성 완료: ${successCount}개 성공, ${failCount}개 실패`);
+      
+      if (successCount === 0) {
+        throw new Error('모든 패널 생성이 실패했습니다');
+      }
+
+      console.log(`✅ 연속성 배치 생성 완료: ${batchResult.data.successCount}/${batchResult.data.totalPanels}개 성공`);
+
+      // 결과를 batch_panel_result 테이블에 반영
+      for (const result of batchResult.data.results) {
+        const panelIndex = result.panelIndex;
+        const correspondingPanel = pendingPanels.find(p => p.panel_order === panelIndex + 1);
         
-        if (response?.imageUrl) {
-          // 성공 시 패널 결과 업데이트
+        if (!correspondingPanel) continue;
+
+        if (result.success && result.imageUrl) {
+          // 성공한 패널 업데이트
           await supabase
             .from('batch_panel_result')
             .update({
               status: 'completed',
-              image_url: response.imageUrl,
-              generation_id: response.generationId,
-              tokens_used: response.tokensUsed || 2000,
+              image_url: result.imageUrl,
+              generation_id: result.generationId,
+              tokens_used: result.tokensUsed || 1290,
               completed_at: new Date().toISOString()
             })
-            .eq('id', panel.id);
-          
-          totalTokensUsed += response.tokensUsed || 2000;
-          completedCount++;
-          
-          // 패널 테이블에도 업데이트 (generationId 제거)
+            .eq('id', correspondingPanel.id);
+
+          // panel 테이블에도 반영
           await supabase
             .from('panel')
             .upsert({
-              projectId: (await supabase.from('batch_generation_job').select('project_id').eq('id', jobId).single()).data?.project_id,
-              order: panel.panel_order,
-              prompt: panel.prompt,
-              imageUrl: response.imageUrl
+              projectId: jobData.project_id,
+              order: panelIndex + 1,
+              prompt: correspondingPanel.prompt,
+              imageUrl: result.imageUrl
             }, {
               onConflict: 'projectId,order'
             });
-          
+
+          totalTokensUsed += result.tokensUsed || 1290;
+          completedCount++;
         } else {
-          throw new Error('이미지 생성 실패');
+          // 실패한 패널 처리
+          await supabase
+            .from('batch_panel_result')
+            .update({
+              status: 'failed',
+              error_message: result.error || '이미지 생성 실패',
+              retry_count: correspondingPanel.retry_count + 1,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', correspondingPanel.id);
         }
-        
-        // 진행률 업데이트
-        await supabase
-          .from('batch_generation_job')
-          .update({
-            completed_panels: completedCount,
-            total_tokens_used: totalTokensUsed,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-        
-        // 레이트 리미트 방지 대기
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (panelError) {
-        console.error(`패널 ${panel.panel_order} 생성 실패:`, panelError);
-        
-        // 실패 처리
-        await supabase
-          .from('batch_panel_result')
-          .update({
-            status: 'failed',
-            error_message: panelError instanceof Error ? panelError.message : String(panelError),
-            retry_count: panel.retry_count + 1,
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', panel.id);
       }
+
+      // 전체 작업 진행률 업데이트
+      await supabase
+        .from('batch_generation_job')
+        .update({
+          completed_panels: completedCount,
+          total_tokens_used: totalTokensUsed,
+          current_panel_index: batchResult.data.totalPanels - 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+
+    } catch (batchError) {
+      console.error('연속성 배치 생성 실패:', batchError);
+      throw batchError;
     }
     
     // 전체 작업 완료 처리

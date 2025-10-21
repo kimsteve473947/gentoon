@@ -74,7 +74,7 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com",
-              "connect-src 'self' https://api.tosspayments.com https://log.tosspayments.com https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com https://lzxkvtwuatsrczhctsxb.supabase.co https://ai.google.dev https://generativelanguage.googleapis.com wss://lzxkvtwuatsrczhctsxb.supabase.co",
+              "connect-src 'self' https://api.tosspayments.com https://log.tosspayments.com https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com https://lzxkvtwuatsrczhctsxb.supabase.co https://ai.google.dev https://generativelanguage.googleapis.com https://cdn.jsdelivr.net wss://lzxkvtwuatsrczhctsxb.supabase.co",
               "img-src 'self' data: https: blob:",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",

@@ -383,20 +383,11 @@ ${enhancedPrompt}
     // 향상된 프롬프트 생성
     let enhancedPrompt = originalPrompt;
     
-    // 선택된 캐릭터가 있다면 명확한 지시 추가
+    // 선택된 캐릭터가 있다면 간단한 프롬프트만 추가 (nano-banana-service에서 처리)
     if (selectedCharacters.length > 0) {
-      enhancedPrompt = `
-${originalPrompt}
+      enhancedPrompt = `${originalPrompt}
 
-[선택된 캐릭터 정보]
-${characterDescriptions}
-
-[캐릭터 일관성 요구사항]
-위에 명시된 캐릭터들은 제공된 레퍼런스 이미지와 정확히 일치해야 합니다.
-각 캐릭터의 고유한 특징을 반드시 유지하세요.
-레퍼런스 이미지의 스타일과 외형을 그대로 따라주세요.
-현재 비율(${projectRatio || '기본'})에 최적화된 구도로 생성하세요.
-`;
+[Character Reference Note: ${selectedCharacters.length} characters with reference images provided]`;
     }
     
     console.log(`📸 비율별 레퍼런스 이미지 선택 완료: ${limitedImages.length}개 (최대 3개 제한)`);

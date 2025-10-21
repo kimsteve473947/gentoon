@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { nanoBananaService } from "@/lib/ai/nano-banana-service";
 import { tokenManager } from "@/lib/subscription/token-manager";
 import { checkAndResetTokensIfNeeded } from "@/lib/subscription/token-reset";
 import { characterReferenceManager } from "@/lib/ai/character-reference-manager";
+import { multiPanelContinuityEngine, type MPCPanel } from "@/lib/ai/multi-panel-continuity";
 import type { AspectRatio } from "@/lib/ai/prompt-templates";
 
 export const runtime = 'nodejs';
@@ -93,8 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     
     // 캐릭터 레퍼런스 준비 (기존 API와 동일한 방식)
     let referenceImages: string[] = [];
-    let characterDescriptions: string = "";
-    
+
     if (selectedCharacters.length > 0) {
       console.log(`🎭 [배치 생성] 캐릭터 레퍼런스 로딩: ${selectedCharacters.length}개`);
       
@@ -108,8 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
 
         referenceImages = promptEnhancement.referenceImages;
-        characterDescriptions = promptEnhancement.characterDescriptions;
-        
+
         console.log(`✅ [배치 생성] 캐릭터 레퍼런스 로딩 완료: ${referenceImages.length}개`);
       } catch (error) {
         console.error(`❌ [배치 생성] 캐릭터 레퍼런스 로딩 실패:`, error);
@@ -125,90 +123,75 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`🎯 [배치 생성] 요소 이미지: ${elementImageUrls.length}개`);
 
-    // 🚀 nanobananaMCP 방식: 단순 배치 생성
-    const results = [];
-    let successCount = 0;
-    let failCount = 0;
+    // 🚀 우리만의 MPC(Multi-Panel Continuity) 시스템 사용
+    console.log(`🚀 [MPC 배치] 시작: ${panels.length}개 패널 연속성 생성`);
 
-    console.log(`🚀 [배치 생성] 시작: ${panels.length}개 패널`);
+    // 패널 데이터를 MPC 형식으로 변환
+    const mpcPanels: MPCPanel[] = panels.map(panel => ({
+      order: panel.order,
+      prompt: panel.prompt,
+      characters: panel.characters,
+      elements: panel.elements
+    }));
 
-    for (let i = 0; i < panels.length; i++) {
-      const panel = panels[i];
-      const panelId = `${i + 1}`;
-      
-      try {
-        console.log(`⚡ [배치 생성] ${i + 1}/${panels.length} 패널 생성 중...`);
-        
-        // 기존 API와 동일한 방식: generationQueue 사용
-        const result = await nanoBananaService.generateWebtoonPanel(
-          panel.prompt,
-          {
-            userId: userId,
-            projectId: projectId,
-            panelId: panelId,
-            sessionId: `batch-${Date.now()}`,
-            aspectRatio: aspectRatio,
-            referenceImages: referenceImages, // 전체 캐릭터 레퍼런스 사용
-            elementImageUrls: elementImageUrls
-          }
-        );
+    // MPC 엔진 옵션 설정
+    const mpcOptions = {
+      userId: userId,
+      projectId: projectId,
+      aspectRatio: aspectRatio,
+      characterReferences: referenceImages,
+      elementImageUrls: elementImageUrls,
+      sessionId: `mpc-batch-${Date.now()}`
+    };
 
-        if (result?.imageUrl) {
-          successCount++;
-          results.push({
-            panelIndex: i,
-            panelId: panelId,
-            success: true,
-            imageUrl: result.imageUrl,
-            generationId: result.generationId || `batch-${panelId}`,
-            tokensUsed: result.tokensUsed || 1290
-          });
-          
-          console.log(`✅ [배치 생성] ${i + 1}/${panels.length} 패널 완료`);
-        } else {
-          failCount++;
-          results.push({
-            panelIndex: i,
-            panelId: panelId,
-            success: false,
-            error: result?.error || '이미지 생성 실패'
-          });
-          
-          console.error(`❌ [배치 생성] ${i + 1}/${panels.length} 패널 실패:`, result?.error);
-        }
+    try {
+      // MPC 엔진으로 연속성 있는 배치 생성
+      const mpcResult = await multiPanelContinuityEngine.generateBatchWithContinuity(
+        mpcPanels,
+        mpcOptions
+      );
 
-        // 패널 간 짧은 대기 (API 레이트 리미트 방지)
-        if (i < panels.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      console.log(`🎉 [MPC 배치] 완료: ${mpcResult.successCount}/${mpcResult.totalPanels}개 성공, 평균 연속성: ${mpcResult.averageContinuityScore.toFixed(1)}점`);
 
-      } catch (error) {
-        failCount++;
-        console.error(`❌ [배치 생성] ${i + 1}/${panels.length} 패널 오류:`, error);
-        
-        results.push({
-          panelIndex: i,
-          panelId: panelId,
-          success: false,
-          error: error instanceof Error ? error.message : '알 수 없는 오류'
-        });
-      }
+      // MPC 결과를 기존 API 형식으로 변환
+      const results = mpcResult.results.map(result => ({
+        panelIndex: result.panelIndex,
+        panelId: (result.panelIndex + 1).toString(),
+        success: result.success,
+        imageUrl: result.imageUrl,
+        thumbnailUrl: result.thumbnailUrl,
+        generationId: `mpc-${mpcOptions.sessionId}-${result.panelIndex + 1}`,
+        tokensUsed: result.tokensUsed,
+        error: result.error,
+        continuityScore: result.continuityScore // MPC만의 추가 정보
+      }));
+
+      const successCount = mpcResult.successCount;
+      const failCount = mpcResult.failCount;
+      const totalTokensUsed = mpcResult.totalTokensUsed;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          batchId: `mpc-${mpcOptions.sessionId}`,
+          totalPanels: panels.length,
+          successCount,
+          failCount,
+          results,
+          tokensUsed: totalTokensUsed,
+          averageContinuityScore: mpcResult.averageContinuityScore,
+          sessionId: mpcResult.sessionId
+        },
+        message: `MPC 배치 생성 완료: ${successCount}/${panels.length}개 성공 (평균 연속성: ${mpcResult.averageContinuityScore.toFixed(1)}점)`
+      });
+
+    } catch (mpcError) {
+      console.error("❌ [MPC 배치] 생성 실패:", mpcError);
+      return NextResponse.json({
+        success: false,
+        error: mpcError instanceof Error ? mpcError.message : "MPC 배치 생성 중 오류가 발생했습니다"
+      }, { status: 500 });
     }
-
-    console.log(`🎉 [배치 생성] 완료: 성공 ${successCount}개, 실패 ${failCount}개`);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        batchId,
-        totalPanels: panels.length,
-        successCount,
-        failCount,
-        results,
-        tokensUsed: successCount * 1290
-      },
-      message: `배치 생성 완료: ${successCount}/${panels.length}개 성공`
-    });
 
   } catch (error) {
     console.error("❌ [배치 생성] API 오류:", error);

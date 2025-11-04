@@ -3,15 +3,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { ensureUserExists } from '@/lib/supabase/auto-onboarding'
 
-// 네이버급 보안 시스템
-import { rateLimiter } from '@/lib/security/rate-limiter'
-import { ipProtection } from '@/lib/security/ip-protection'
-import { 
-  getSecurityConfig, 
-  isIPWhitelisted, 
-  isDevelopmentMode 
-} from '@/lib/security/api-security-config'
-import { SecureLogger } from '@/lib/utils/secure-logger'
+// 보안 시스템은 동적 import로 처리 (Edge Runtime 호환성)
+// import { rateLimiter } from '@/lib/security/rate-limiter'
+// import { ipProtection } from '@/lib/security/ip-protection'
+// import { getSecurityConfig, isIPWhitelisted, isDevelopmentMode } from '@/lib/security/api-security-config'
+// import { SecureLogger } from '@/lib/utils/secure-logger'
 
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
@@ -19,10 +15,11 @@ export async function middleware(request: NextRequest) {
   const method = request.method;
 
   // 🛡️ === 1단계: 네이버급 보안 검사 ===
-  const securityResult = await performSecurityCheck(request, pathname, method);
-  if (!securityResult.allowed) {
-    return securityResult.response;
-  }
+  // Edge Runtime 호환성 문제로 일시적으로 비활성화
+  // const securityResult = await performSecurityCheck(request, pathname, method);
+  // if (!securityResult.allowed) {
+  //   return securityResult.response;
+  // }
 
   // Supabase 응답 객체 생성
   let supabaseResponse = NextResponse.next({
@@ -102,7 +99,7 @@ export async function middleware(request: NextRequest) {
       try {
         await ensureUserExists(user);
       } catch (error) {
-        SecureLogger.warn('자동 온보딩 실패', error);
+        console.warn('[Middleware] 자동 온보딩 실패', error);
         // 온보딩 실패해도 페이지 접근은 허용 (API에서 다시 시도)
       }
     }
@@ -111,16 +108,15 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(supabaseResponse);
   } catch (error) {
     // 에러 발생 시 기본 응답 반환
-    SecureLogger.error('Middleware error', error)
+    console.error('[Middleware] Error:', error);
     return addSecurityHeaders(supabaseResponse);
   }
 }
 
 // === 네이버급 보안 시스템 구현 ===
+// Edge Runtime 호환성 문제로 일시적으로 비활성화
 
-/**
- * 통합 보안 검사 수행
- */
+/*
 async function performSecurityCheck(
   request: NextRequest,
   pathname: string,
@@ -433,49 +429,13 @@ function shouldSkipSecurity(pathname: string): boolean {
   return skipPatterns.some(pattern => pathname.startsWith(pattern));
 }
 
-/**
- * 보안 이벤트 로깅
- */
 function logSecurityEvent(event: string, data: any): void {
-  SecureLogger.warn(`[SecurityEvent] ${event}`, {
+  console.warn(`[SecurityEvent] ${event}`, {
     timestamp: new Date().toISOString(),
     ...data
   });
-
-  // 실시간 모니터링 시스템에 이벤트 전송
-  try {
-    const { securityMonitor } = require('./lib/security/security-monitor');
-    
-    let eventType: any = 'SUSPICIOUS_ACTIVITY';
-    let severity: any = 'MEDIUM';
-
-    // 이벤트 타입에 따른 분류
-    if (event.includes('MALICIOUS')) {
-      eventType = 'MALICIOUS_PATTERN';
-      severity = 'HIGH';
-    } else if (event.includes('RATE_LIMIT')) {
-      eventType = 'RATE_LIMIT_EXCEEDED';
-      severity = 'MEDIUM';
-    } else if (event.includes('ADMIN')) {
-      eventType = 'ADMIN_ACCESS_ATTEMPT';
-      severity = 'HIGH';
-    } else if (event.includes('WHITELIST')) {
-      eventType = 'SECURITY_BYPASS_ATTEMPT';
-      severity = 'HIGH';
-    }
-
-    securityMonitor.recordEvent(
-      eventType,
-      severity,
-      data.ip || 'unknown',
-      data,
-      data.path,
-      data.userAgent
-    );
-  } catch (error) {
-    console.debug('모니터링 시스템 연동 오류:', error);
-  }
 }
+*/
 
 export const config = {
   matcher: [

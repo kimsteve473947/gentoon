@@ -27,8 +27,8 @@ interface SuspiciousPattern {
 
 export class IPProtectionSystem {
   private ipRecords = new Map<string, IPRecord>();
-  private cleanupInterval: NodeJS.Timeout;
-  
+  private cleanupInterval?: NodeJS.Timeout;
+
   // 한국 허용 IP 범위 (주요 ISP)
   private readonly KOREA_IP_RANGES = [
     '1.0.0.0/8',        // KT
@@ -61,10 +61,18 @@ export class IPProtectionSystem {
   ];
 
   constructor() {
-    // 5분마다 정리 작업
-    this.cleanupInterval = setInterval(() => {
-      this.cleanup();
-    }, 5 * 60 * 1000);
+    // Edge Runtime에서는 setInterval이 제한적이므로 조건부 실행
+    if (typeof setInterval !== 'undefined') {
+      try {
+        // 5분마다 정리 작업
+        this.cleanupInterval = setInterval(() => {
+          this.cleanup();
+        }, 5 * 60 * 1000);
+      } catch (error) {
+        // Edge Runtime에서 실패 시 무시
+        console.debug('Cleanup interval not available in Edge Runtime');
+      }
+    }
   }
 
   /**

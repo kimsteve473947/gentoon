@@ -47,7 +47,6 @@ interface ScriptPanel {
 }
 
 interface AIScriptGeneratorProps {
-  onScriptGenerated: (panels: ScriptPanel[]) => void;
   onApplyToCanvas?: (panels: ScriptPanel[]) => void;
   className?: string;
   generatedScript?: ScriptPanel[];
@@ -59,8 +58,7 @@ interface AIScriptGeneratorProps {
   selectedElementIds?: string[];
 }
 
-export function AIScriptGenerator({ 
-  onScriptGenerated, 
+export function AIScriptGenerator({
   onApplyToCanvas, 
   className,
   generatedScript: externalGeneratedScript,
@@ -339,13 +337,12 @@ export function AIScriptGenerator({
         console.log('📝 새로 생성된 대본:', newScript);
       }
 
-      // 🚀 3단계: 생성된 대본으로 바로 배치 생성 호출
-      console.log('🚀 배치 생성 시작 - 사용할 대본:', scriptToUse);
-      onScriptGenerated(scriptToUse);
-      
+      // 대본 생성 완료 - 사용자가 수동으로 적용 가능
+      console.log('✅ 대본 생성 완료 - 사용자가 캔버스에 적용 가능:', scriptToUse);
+
     } catch (error) {
-      console.error('❌ 대본 생성 및 배치 생성 오류:', error);
-      alert('대본 생성 및 배치 생성 중 오류가 발생했습니다.');
+      console.error('❌ 대본 생성 오류:', error);
+      alert('대본 생성 중 오류가 발생했습니다.');
     } finally {
       setIsGenerating(false);
     }

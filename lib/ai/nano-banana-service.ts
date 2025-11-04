@@ -56,22 +56,22 @@ export class NanoBananaService {
       }
     }
     
-    // 2. 로컬 환경에서 파일 직접 읽기 (개발용)
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // 2. 로컬 환경에서 파일 직접 읽기 (개발용 - Vercel에서는 스킵)
+    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
       try {
         const fs = require('fs');
         const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
         console.log('🔑 로컬 credentials 파일 로드 시도:', credentialsPath);
-        
+
         if (fs.existsSync(credentialsPath)) {
           const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
           credentials = JSON.parse(credentialsContent);
           console.log('✅ 로컬 파일에서 Vertex AI credentials 로드 성공');
         } else {
-          console.error('❌ Credentials 파일 없음:', credentialsPath);
+          console.warn('⚠️ Credentials 파일 없음:', credentialsPath);
         }
       } catch (error) {
-        console.error('❌ Credentials 파일 읽기 실패:', error);
+        console.warn('⚠️ Credentials 파일 읽기 실패 (Vercel에서는 정상):', error);
       }
     }
     

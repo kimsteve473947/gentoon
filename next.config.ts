@@ -1,15 +1,26 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Vercel 배포 최적화
+  output: 'standalone',
+
   // ESLint 설정 (빌드 시 경고 허용)
   eslint: {
     ignoreDuringBuilds: true,
   },
-  
+
   // TypeScript 설정 (빌드 시 경고 허용)
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // 404 페이지 생성 스킵 (Html import 에러 방지)
+  generateBuildId: async () => {
+    return 'build-' + Date.now();
+  },
+
+  // Static generation 비활성화 (self is not defined 에러 방지)
+  generateStaticParams: false,
   
   // 성능 최적화 설정
   experimental: {
@@ -22,6 +33,7 @@ const nextConfig: NextConfig = {
       'react-hook-form',
       '@tanstack/react-query'
     ],
+    serverComponentsExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas'],
   },
   
   // 워크스페이스 루트 설정 (경고 해결)

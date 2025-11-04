@@ -55,13 +55,21 @@ export const RATE_LIMIT_CONFIG: Record<SecurityLevel, RateLimitConfig> = {
 
 class RateLimiter {
   private records = new Map<string, RequestRecord>();
-  private cleanupInterval: NodeJS.Timeout;
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor() {
-    // 메모리 정리 (5분마다)
-    this.cleanupInterval = setInterval(() => {
-      this.cleanup();
-    }, 5 * 60 * 1000);
+    // Edge Runtime에서는 setInterval이 제한적이므로 조건부 실행
+    if (typeof setInterval !== 'undefined') {
+      try {
+        // 메모리 정리 (5분마다)
+        this.cleanupInterval = setInterval(() => {
+          this.cleanup();
+        }, 5 * 60 * 1000);
+      } catch (error) {
+        // Edge Runtime에서 실패 시 무시
+        console.debug('Cleanup interval not available in Edge Runtime');
+      }
+    }
   }
 
   /**

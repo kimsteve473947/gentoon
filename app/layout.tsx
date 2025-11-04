@@ -3,6 +3,10 @@ import { Inter } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import "./globals.css";
 
+// Force dynamic rendering for all pages
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",

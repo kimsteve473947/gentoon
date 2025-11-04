@@ -1,22 +1,29 @@
 /**
  * 보안 로깅 유틸리티
  * 프로덕션 환경에서 민감한 정보 로깅 방지
+ * Edge Runtime 호환성 지원
  */
-
-import fs from 'fs';
-import path from 'path';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Edge Runtime 감지
+const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
+
 export class SecureLogger {
   /**
    * 프로덕션에서 중요 로그를 파일에 저장
+   * Edge Runtime에서는 스킵
    */
   private static writeToFile(level: 'error' | 'warn' | 'security', message: string, data?: any) {
-    if (!isProduction) return;
+    // Edge Runtime 또는 개발 환경에서는 파일 저장 스킵
+    if (!isProduction || isEdgeRuntime) return;
 
     try {
+      // 동적 import로 fs 모듈 로드 (Edge Runtime에서는 실행되지 않음)
+      const fs = require('fs');
+      const path = require('path');
+
       const logDir = path.join(process.cwd(), 'logs');
       if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
@@ -34,7 +41,7 @@ export class SecureLogger {
 
       const logFile = path.join(logDir, `${level}-${new Date().toISOString().split('T')[0]}.log`);
       const logLine = JSON.stringify(logEntry) + '\n';
-      
+
       fs.appendFileSync(logFile, logLine);
     } catch (fileError) {
       // 파일 저장 실패 시 콘솔에만 출력 (무한 루프 방지)

@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
 
   // 성능 최적화 설정
   experimental: {
-    dynamicIO: true, // Next.js 15 feature to force ALL pages dynamic
+    // dynamicIO: true, // Next.js 15 canary only - 제거
     optimizePackageImports: [
       '@radix-ui',
       'lucide-react',

@@ -19,11 +19,12 @@ const nextConfig: NextConfig = {
     return 'build-' + Date.now();
   },
 
-  // 정적 최적화 완전 비활성화
+  // ✅ 정적 최적화 완전 비활성화 (Supabase SSR과 Edge Runtime 호환성 문제 해결)
   // generateStaticParams: false, // 제거됨 - Next.js 15에서 지원 안함
-  
+
   // 성능 최적화 설정
   experimental: {
+    dynamicIO: true, // Next.js 15 feature to force ALL pages dynamic
     optimizePackageImports: [
       '@radix-ui',
       'lucide-react',

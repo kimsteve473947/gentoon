@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { ensureUserExists } from '@/lib/supabase/auto-onboarding'
+// import { ensureUserExists } from '@/lib/supabase/auto-onboarding' // Edge Runtime 비호환 - 비활성화
 
 // 보안 시스템은 동적 import로 처리 (Edge Runtime 호환성)
 // import { rateLimiter } from '@/lib/security/rate-limiter'
@@ -95,14 +95,16 @@ export async function middleware(request: NextRequest) {
     }
 
     // 🚀 자동 사용자 온보딩 (로그인 사용자만)
-    if (user && isProtected) {
-      try {
-        await ensureUserExists(user);
-      } catch (error) {
-        console.warn('[Middleware] 자동 온보딩 실패', error);
-        // 온보딩 실패해도 페이지 접근은 허용 (API에서 다시 시도)
-      }
-    }
+    // Edge Runtime 호환성 문제로 일시적으로 비활성화
+    // API 레벨에서 처리하도록 변경
+    // if (user && isProtected) {
+    //   try {
+    //     await ensureUserExists(user);
+    //   } catch (error) {
+    //     console.warn('[Middleware] 자동 온보딩 실패', error);
+    //     // 온보딩 실패해도 페이지 접근은 허용 (API에서 다시 시도)
+    //   }
+    // }
 
     // 🛡️ 보안 헤더 추가
     return addSecurityHeaders(supabaseResponse);

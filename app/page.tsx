@@ -12,6 +12,10 @@ import { InquiryWidget } from "@/components/ui/inquiry-widget";
 import Footer from "@/components/Footer";
 import { createBrowserClient } from '@supabase/ssr';
 
+// Force dynamic rendering (no SSG)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function Home() {
   const router = useRouter();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);

@@ -19,8 +19,8 @@ const nextConfig: NextConfig = {
     return 'build-' + Date.now();
   },
 
-  // Static generation 비활성화 (self is not defined 에러 방지)
-  generateStaticParams: false,
+  // 정적 최적화 완전 비활성화
+  // generateStaticParams: false, // 제거됨 - Next.js 15에서 지원 안함
   
   // 성능 최적화 설정
   experimental: {

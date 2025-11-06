@@ -34,8 +34,10 @@ const nextConfig: NextConfig = {
       'react-hook-form',
       '@tanstack/react-query'
     ],
-    serverComponentsExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas'],
   },
+
+  // ⚠️ Move serverComponentsExternalPackages to top level (Next.js 15 change)
+  serverExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas', '@supabase/ssr', '@supabase/supabase-js'],
   
   // 워크스페이스 루트 설정 (경고 해결)
   outputFileTracingRoot: process.cwd(),

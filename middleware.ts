@@ -9,7 +9,9 @@ import type { NextRequest } from 'next/server'
 // import { getSecurityConfig, isIPWhitelisted, isDevelopmentMode } from '@/lib/security/api-security-config'
 // import { SecureLogger } from '@/lib/utils/secure-logger'
 
-export async function middleware(request: NextRequest) {
+// TEMPORARY: Middleware disabled to fix Supabase SSR Edge Runtime issue
+// Re-enable after resolving the build error
+export async function middleware_DISABLED(request: NextRequest) {
   const startTime = Date.now();
   const { pathname } = new URL(request.url);
   const method = request.method;

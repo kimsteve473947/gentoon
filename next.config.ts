@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Vercel 배포 최적화
-  output: 'standalone',
+  // 🔥 CRITICAL: output 제거 - standalone 모드가 Collecting page data 에러 유발
+  // output: 'standalone',
 
   // ESLint 설정 (빌드 시 경고 허용)
   eslint: {

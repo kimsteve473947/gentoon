@@ -1,4 +1,5 @@
-import { createServerClient } from '@supabase/ssr'
+// ⚠️ CRITICAL: @supabase/ssr를 상단에서 import하면 Edge Runtime 빌드 에러 발생
+// 동적 import로만 사용해야 함
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 // import { ensureUserExists } from '@/lib/supabase/auto-onboarding' // Edge Runtime 비호환 - 비활성화
@@ -27,12 +28,9 @@ export async function middleware(request: NextRequest) {
   })
 
   try {
-    // ⚠️ Build 시에는 Supabase 우회 (Edge Runtime 에러 방지)
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-      return addSecurityHeaders(supabaseResponse);
-    }
+    // ⚠️ 동적 import로 Supabase 클라이언트 로드 (Edge Runtime 호환)
+    const { createServerClient } = await import('@supabase/ssr');
 
-    // Runtime에서만 실제 Supabase 클라이언트 로드 (동적 import)
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

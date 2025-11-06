@@ -1,30 +1,10 @@
 import { cookies } from 'next/headers'
 
 export async function createClient() {
-  // ⚠️ CRITICAL FIX: Build 시에는 Supabase 연결 우회 (Edge Runtime 에러 방지)
-  if (process.env.NEXT_PHASE === 'phase-production-build') {
-    // 빌드 타임에는 mock 클라이언트 반환
-    return {
-      auth: {
-        getUser: async () => ({ data: { user: null }, error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
-      },
-      from: () => ({
-        select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
-        insert: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) }),
-        update: () => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) }) }),
-        delete: () => ({ eq: async () => ({ data: null, error: null }) })
-      }),
-      storage: {
-        from: () => ({
-          upload: async () => ({ data: null, error: null }),
-          getPublicUrl: () => ({ data: { publicUrl: '' } })
-        })
-      }
-    } as any;
-  }
+  // ⚠️ CRITICAL FIX: @supabase/ssr 동적 import로 Edge Runtime 에러 완전 방지
+  // 빌드 타임에는 이 함수가 호출되지 않도록 하는 것이 최선이지만,
+  // 만약 호출되면 동적 import로 처리하여 에러 방지
 
-  // Runtime에서만 실제 Supabase 클라이언트 로드 (동적 import)
   const { createServerClient } = await import('@supabase/ssr');
   const cookieStore = await cookies()
 

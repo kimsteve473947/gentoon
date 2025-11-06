@@ -16,13 +16,14 @@ export default function Home() {
   const router = useRouter();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = loading
-  
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   useEffect(() => {
+    // Supabase 클라이언트는 브라우저에서만 생성 (SSR 오류 방지)
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
     // 초기 로그인 상태 체크
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,7 +38,7 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []); // 빈 의존성 배열
 
   const handleStartClick = () => {
     if (isLoggedIn) {

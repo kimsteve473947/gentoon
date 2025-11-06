@@ -121,18 +121,15 @@ const nextConfig: NextConfig = {
   // Webpack 설정
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
     // 🔥 CRITICAL: Supabase 패키지를 서버 빌드에서 완전히 제외
+    // serverExternalPackages만으로는 충분하지 않으므로 webpack externals로도 명시
     if (isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        '@supabase/ssr': 'commonjs @supabase/ssr',
-        '@supabase/supabase-js': 'commonjs @supabase/supabase-js',
-        '@supabase/realtime-js': 'commonjs @supabase/realtime-js',
-        '@supabase/postgrest-js': 'commonjs @supabase/postgrest-js',
-        '@supabase/storage-js': 'commonjs @supabase/storage-js',
-        '@supabase/functions-js': 'commonjs @supabase/functions-js',
-        '@supabase/auth-js': 'commonjs @supabase/auth-js',
-        '@supabase/gotrue-js': 'commonjs @supabase/gotrue-js',
-      });
+      // 기존 externals 배열 방식 유지하되, Supabase 패키지 추가
+      if (!Array.isArray(config.externals)) {
+        config.externals = [];
+      }
+
+      // Supabase 패키지를 정규식으로 매칭
+      config.externals.push(/@supabase\/.*/);
     }
 
     // 개발 환경에서 빌드 속도 향상

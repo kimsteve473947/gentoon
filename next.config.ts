@@ -126,9 +126,30 @@ const nextConfig: NextConfig = {
   
   // Webpack 설정
   webpack: (config: any, { isServer, webpack }: { isServer: boolean; webpack: any }) => {
-    // 🔥 CRITICAL: Supabase 패키지를 서버 빌드에서 완전히 제외
-    // serverExternalPackages만으로는 충분하지 않으므로 webpack externals로도 명시
+    // 🔥 CRITICAL: Inject self polyfill at the beginning of server bundle
     if (isServer) {
+      const originalEntry = config.entry;
+      config.entry = async () => {
+        const entries = await originalEntry();
+
+        // Inject polyfill into ALL server entries
+        Object.keys(entries).forEach((key) => {
+          if (Array.isArray(entries[key])) {
+            entries[key].unshift('./lib/polyfills/self-polyfill.js');
+          } else if (typeof entries[key] === 'string') {
+            entries[key] = ['./lib/polyfills/self-polyfill.js', entries[key]];
+          } else if (entries[key].import) {
+            if (Array.isArray(entries[key].import)) {
+              entries[key].import.unshift('./lib/polyfills/self-polyfill.js');
+            } else {
+              entries[key].import = ['./lib/polyfills/self-polyfill.js', entries[key].import];
+            }
+          }
+        });
+
+        return entries;
+      };
+
       // 기존 externals 배열 방식 유지하되, Supabase 패키지 추가
       if (!Array.isArray(config.externals)) {
         config.externals = [];

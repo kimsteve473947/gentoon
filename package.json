@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build && node scripts/patch-build.js",
+    "build": "prisma generate && node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build && node scripts/patch-build.js",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",

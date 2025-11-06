@@ -136,14 +136,6 @@ const nextConfig: NextConfig = {
 
       // Supabase 패키지를 정규식으로 매칭
       config.externals.push(/@supabase\/.*/);
-
-      // 🚨 NEW: NormalModuleReplacementPlugin으로 Supabase 패키지를 빈 모듈로 교체
-      config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
-          /@supabase\/(realtime-js|supabase-js)/,
-          require.resolve('./lib/supabase/empty-module.js')
-        )
-      );
     }
 
     // 개발 환경에서 빌드 속도 향상

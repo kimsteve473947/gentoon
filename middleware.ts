@@ -155,7 +155,7 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   securityHeaders['Content-Security-Policy'] = cspValue;
 
   // CORS 헤더 (개발 환경에서만 관대하게)
-  if (isDevelopmentMode()) {
+  if (process.env.NODE_ENV === 'development') {
     securityHeaders['Access-Control-Allow-Origin'] = '*';
     securityHeaders['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
     securityHeaders['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';

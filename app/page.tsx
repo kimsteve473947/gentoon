@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AuthModal } from "@/components/auth/AuthModal";
 import { InquiryWidget } from "@/components/ui/inquiry-widget";
 import Footer from "@/components/Footer";
-import { createBrowserClient } from '@supabase/ssr';
 
 export default function Home() {
   const router = useRouter();
@@ -18,26 +17,31 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = loading
 
   useEffect(() => {
-    // Supabase 클라이언트는 브라우저에서만 생성 (SSR 오류 방지)
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Dynamic import로 Supabase를 브라우저에서만 로드 (SSR 완전 방지)
+    const initSupabase = async () => {
+      const { createBrowserClient } = await import('@supabase/ssr');
 
-    // 초기 로그인 상태 체크
-    const checkUser = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // 초기 로그인 상태 체크
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
+
+      // 로그인 상태 변화 감지
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        setIsLoggedIn(!!session?.user);
+      });
+
+      return () => subscription.unsubscribe();
     };
 
-    checkUser();
-
-    // 로그인 상태 변화 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsLoggedIn(!!session?.user);
-    });
-
-    return () => subscription.unsubscribe();
+    const cleanup = initSupabase();
+    return () => {
+      cleanup.then(fn => fn?.());
+    };
   }, []); // 빈 의존성 배열
 
   const handleStartClick = () => {

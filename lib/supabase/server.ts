@@ -1,11 +1,9 @@
-import { cookies } from 'next/headers'
-
+// ⚠️ CRITICAL: 모든 import를 동적으로 처리하여 빌드 타임 분석 방지
 export async function createClient() {
-  // ⚠️ CRITICAL FIX: @supabase/ssr 동적 import로 Edge Runtime 에러 완전 방지
-  // 빌드 타임에는 이 함수가 호출되지 않도록 하는 것이 최선이지만,
-  // 만약 호출되면 동적 import로 처리하여 에러 방지
-
+  // cookies도 동적 import
+  const { cookies } = await import('next/headers');
   const { createServerClient } = await import('@supabase/ssr');
+
   const cookieStore = await cookies()
 
   return createServerClient(

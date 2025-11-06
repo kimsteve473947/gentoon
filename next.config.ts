@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
     ],
     // 🎯 모든 페이지를 동적 렌더링으로 강제
     isrMemoryCacheSize: 0, // ISR 캐시 비활성화
+    // 정적 페이지 미리 렌더링 완전 비활성화
+    staticPageGenerationTimeout: 0,
   },
 
   // 🔥 CRITICAL: 빌드 타임 정적 생성 완전 비활성화

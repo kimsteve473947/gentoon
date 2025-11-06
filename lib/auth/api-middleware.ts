@@ -83,6 +83,30 @@ export function withAuth<T = any>(
 }
 
 /**
+ * 사용자의 관리자 권한 확인
+ */
+export async function isUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data: userData, error } = await supabase
+      .from('user')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (error || !userData) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+
+    return userData.role === 'ADMIN';
+  } catch (error) {
+    console.error('Error in isUserAdmin:', error);
+    return false;
+  }
+}
+
+/**
  * 관리자 권한 확인 미들웨어
  */
 export function withAdminAuth<T = any>(

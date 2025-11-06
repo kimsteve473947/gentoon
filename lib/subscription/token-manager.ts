@@ -31,7 +31,7 @@ export class TokenManager {
 
   /**
    * 실제 Gemini 토큰 사용량을 기반으로 한 이미지 생성 토큰 차감
-   * Vertex AI API에서 반환된 실제 토큰 수를 사용하여 정확한 추적
+   * Google AI Studio API에서 반환된 실제 토큰 수를 사용하여 정확한 추적
    */
   async useActualTokensFromGemini(
     userId: string, 
@@ -247,7 +247,7 @@ export class TokenManager {
 
   /**
    * 실제 Gemini 토큰 사용량을 기반으로 한 텍스트 생성 토큰 차감
-   * Vertex AI API에서 반환된 실제 토큰 수를 사용하여 정확한 추적
+   * Google AI Studio API에서 반환된 실제 토큰 수를 사용하여 정확한 추적
    */
   async useTextGenerationTokens(
     userId: string, 

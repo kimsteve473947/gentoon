@@ -1,6 +1,6 @@
 /**
  * 사용자별 AI 세션 격리 시스템
- * Vertex AI API 키를 공유하면서도 사용자별 격리 보장
+ * Google AI Studio API 키를 공유하면서도 사용자별 격리 보장
  */
 
 import crypto from 'crypto';

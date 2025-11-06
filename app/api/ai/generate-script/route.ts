@@ -178,9 +178,9 @@ ${selectedElementDetails.length > 0 ? `사용 가능한 요소: ${selectedElemen
 ⚠️ 반드시 각 패널의 characters 배열에 3명 이하의 캐릭터만 포함하세요.
 한국어로만 응답하세요:`;
 
-    console.log('🤖 Sending prompt to Vertex AI:', scriptPrompt.substring(0, 200) + '...');
+    console.log('🤖 Sending prompt to Google AI Studio:', scriptPrompt.substring(0, 200) + '...');
 
-    // 🔐 사용자별 격리된 Vertex AI (Gemini)로 대본 생성 - 텍스트 생성 모드
+    // 🔐 사용자별 격리된 Google AI Studio (Gemini)로 대본 생성 - 텍스트 생성 모드
     let response;
     try {
       // 세션 ID 생성 (사용자별 고유 텍스트 생성 세션)
@@ -218,8 +218,8 @@ ${selectedElementDetails.length > 0 ? `사용 가능한 요소: ${selectedElemen
       return ApiResponse.aiServiceError('AI에서 유효한 응답을 받지 못했습니다');
     }
 
-    console.log('🔍 Raw Vertex AI response:', response.text);
-    console.log('📊 Token usage from Vertex AI:', response.tokensUsed);
+    console.log('🔍 Raw Google AI Studio response:', response.text);
+    console.log('📊 Token usage from Google AI Studio:', response.tokensUsed);
 
     // JSON 파싱 개선
     let scriptData;

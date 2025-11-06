@@ -305,7 +305,7 @@ ${character.personality}
       referenceImages.push(...character.referenceImages.slice(0, 1));
     });
     
-    // ⚠️ 전체 레퍼런스 이미지를 최대 3개로 제한 (Vertex AI 토큰 한도 고려)
+    // ⚠️ 전체 레퍼런스 이미지를 최대 3개로 제한 (Google AI Studio 토큰 한도 고려)
     const limitedReferenceImages = referenceImages.slice(0, 3);
     if (referenceImages.length > 3) {
       console.warn(`⚠️ 감지된 캐릭터의 레퍼런스 이미지가 ${referenceImages.length}개에서 3개로 제한됨`);
@@ -369,15 +369,15 @@ ${enhancedPrompt}
     selectedCharacters.forEach(character => {
       characterDescriptions += this.buildCharacterDescriptionForAI(character) + "\n\n";
       
-      // ⭐ 캐릭터당 1개 이미지만 사용 (Vertex AI 3개 제한 고려)
+      // ⭐ 캐릭터당 1개 이미지만 사용 (Google AI Studio 3개 제한 고려)
       const ratioSpecificImages = this.selectRatioSpecificImages(character, projectRatio);
       referenceImages.push(...ratioSpecificImages.slice(0, 1)); // 캐릭터당 1개
     });
     
-    // ⚠️ Vertex AI 멀티모달 최대 제한: 3개 이미지
+    // ⚠️ Google AI Studio 멀티모달 최대 제한: 3개 이미지
     const limitedImages = referenceImages.slice(0, 3);
     if (referenceImages.length > 3) {
-      console.warn(`⚠️ 레퍼런스 이미지가 ${referenceImages.length}개에서 3개로 제한됨 (Vertex AI 멀티모달 제한)`);
+      console.warn(`⚠️ 레퍼런스 이미지가 ${referenceImages.length}개에서 3개로 제한됨 (Google AI Studio 멀티모달 제한)`);
     }
     
     // 향상된 프롬프트 생성

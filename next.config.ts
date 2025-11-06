@@ -39,6 +39,11 @@ const nextConfig: NextConfig = {
     isrMemoryCacheSize: 0, // ISR 캐시 비활성화
   },
 
+  // 🔥 CRITICAL: 빌드 타임 정적 생성 완전 비활성화
+  // "Collecting page data" 단계를 스킵하여 Supabase SSR 에러 방지
+  skipTrailingSlashRedirect: true,
+  skipMiddlewareUrlNormalize: true,
+
   // ⚠️ Move serverComponentsExternalPackages to top level (Next.js 15 change)
   // Supabase packages marked as external to avoid Edge Runtime issues
   serverExternalPackages: [

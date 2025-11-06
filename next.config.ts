@@ -40,7 +40,19 @@ const nextConfig: NextConfig = {
 
   // ⚠️ Move serverComponentsExternalPackages to top level (Next.js 15 change)
   // Supabase packages marked as external to avoid Edge Runtime issues
-  serverExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas', '@supabase/ssr', '@supabase/supabase-js', '@supabase/realtime-js'],
+  serverExternalPackages: [
+    'sharp',
+    '@img/sharp-libvips-dev',
+    'canvas',
+    '@supabase/ssr',
+    '@supabase/supabase-js',
+    '@supabase/realtime-js',
+    '@supabase/postgrest-js',
+    '@supabase/storage-js',
+    '@supabase/functions-js',
+    '@supabase/auth-js',
+    '@supabase/gotrue-js'
+  ],
   
   // 워크스페이스 루트 설정 (경고 해결)
   outputFileTracingRoot: process.cwd(),

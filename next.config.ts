@@ -20,7 +20,6 @@ const nextConfig: NextConfig = {
   },
 
   // ✅ 정적 최적화 완전 비활성화 (Supabase SSR과 Edge Runtime 호환성 문제 해결)
-  // generateStaticParams: false, // 제거됨 - Next.js 15에서 지원 안함
 
   // 🔥 CRITICAL FIX: 페이지 정적 생성 완전 비활성화
   // 이렇게 하면 "Collecting page data" 단계를 스킵하여 Supabase SSR 에러 방지

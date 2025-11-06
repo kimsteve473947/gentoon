@@ -9,9 +9,7 @@ import type { NextRequest } from 'next/server'
 // import { getSecurityConfig, isIPWhitelisted, isDevelopmentMode } from '@/lib/security/api-security-config'
 // import { SecureLogger } from '@/lib/utils/secure-logger'
 
-// TEMPORARY: Middleware disabled to fix Supabase SSR Edge Runtime issue
-// Re-enable after resolving the build error
-export async function middleware_DISABLED(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const { pathname } = new URL(request.url);
   const method = request.method;
@@ -29,7 +27,12 @@ export async function middleware_DISABLED(request: NextRequest) {
   })
 
   try {
-    // Supabase 클라이언트 생성
+    // ⚠️ Build 시에는 Supabase 우회 (Edge Runtime 에러 방지)
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return addSecurityHeaders(supabaseResponse);
+    }
+
+    // Runtime에서만 실제 Supabase 클라이언트 로드 (동적 import)
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

@@ -24,91 +24,23 @@ export class NanoBananaService {
   private model: string = 'gemini-2.5-flash-image-preview';
   
   constructor() {
-    // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
-    const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.trim();
-    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.trim();
-    
-    if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
+    // Google AI Studio API Key 사용 (간단한 인증)
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("GOOGLE_AI_API_KEY is required for Google AI Studio");
     }
 
-    // 서비스 계정 credentials 구성
-    let credentials = null;
-    
-    // 1. 환경변수로 개별 값 사용 (Vercel 권장 방식)
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-      try {
-        credentials = {
-          type: "service_account",
-          project_id: process.env.GOOGLE_CLOUD_PROJECT_ID || projectId,
-          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          auth_uri: "https://accounts.google.com/o/oauth2/auth",
-          token_uri: "https://oauth2.googleapis.com/token",
-          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL
-        };
-        console.log('✅ 환경변수에서 Vertex AI credentials 구성 성공');
-      } catch (error) {
-        console.error('❌ 환경변수 credentials 구성 실패:', error);
-      }
-    }
-    
-    // 2. 로컬 환경에서 파일 직접 읽기 (개발용 - Vercel에서는 스킵)
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
-      try {
-        const fs = require('fs');
-        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        console.log('🔑 로컬 credentials 파일 로드 시도:', credentialsPath);
+    console.log('✅ Google AI Studio API Key 로드 성공');
 
-        if (fs.existsSync(credentialsPath)) {
-          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
-          credentials = JSON.parse(credentialsContent);
-          console.log('✅ 로컬 파일에서 Vertex AI credentials 로드 성공');
-        } else {
-          console.warn('⚠️ Credentials 파일 없음:', credentialsPath);
-        }
-      } catch (error) {
-        console.warn('⚠️ Credentials 파일 읽기 실패 (Vercel에서는 정상):', error);
-      }
-    }
-    
-    // 3. Vercel JSON 환경변수 사용 (백업 방식)
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-      try {
-        const cleanJsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
-        credentials = JSON.parse(cleanJsonString);
-        
-        if (credentials.private_key) {
-          credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-        }
-        
-        console.log('✅ JSON 환경변수에서 credentials 로드 성공');
-      } catch (error) {
-        console.error('❌ JSON credentials 파싱 실패:', error);
-      }
-    }
-    
-    if (!credentials) {
-      throw new Error("Vertex AI credentials를 찾을 수 없습니다");
-    }
-    
-    // Vertex AI 방식으로 초기화
+    // Google AI Studio 방식으로 초기화 (API Key만 필요)
     this.genAI = new GoogleGenAI({
-      project: projectId,
-      location: location,
-      credentials: credentials
+      apiKey: apiKey
     });
-    
+
     this.webpOptimizer = new WebPOptimizer();
-    
-    console.log('✅ Vertex AI 초기화 완료:', {
-      project: projectId,
-      location: location,
-      hasCredentials: !!credentials
-    });
+
+    console.log('✅ Google AI Studio 초기화 완료 (API Key 방식)');
   }
 
   /**

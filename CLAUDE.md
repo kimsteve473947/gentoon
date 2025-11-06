@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GenToon - AI 기반 웹툰 제작 SaaS 플랫폼
 - 한국 시장 특화 (Toss Payments 통합)
-- Google Vertex AI Gemini 2.5 Flash를 활용한 이미지 생성
+- Google AI Studio Gemini 2.5 Flash를 활용한 이미지 생성 (API Key 방식)
 - AI 대본 생성 및 캐릭터 자동 매핑 시스템
 - 캐릭터 일관성 유지 시스템 (비율별 레퍼런스 이미지 지원)
 - 토큰 기반 구독 모델
@@ -47,8 +47,8 @@ npx tsx <script>        # Run TypeScript files directly
 - **Framework**: Next.js 15.5.2 (App Router)
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS v4 + Shadcn/ui
-- **Database**: Supabase (PostgreSQL) + Prisma ORM  
-- **AI**: Google Vertex AI (Gemini 2.5 Flash Image Preview)
+- **Database**: Supabase (PostgreSQL) + Prisma ORM
+- **AI**: Google AI Studio (Gemini 2.5 Flash Image Preview) - API Key 방식
 - **Storage**: Supabase Storage
 - **Payments**: Toss Payments (Korean payment system)
 - **Auth**: Supabase Auth
@@ -103,7 +103,7 @@ npx tsx <script>        # Run TypeScript files directly
 - Multi-panel canvas with drag-and-drop
 - Speech bubble system with 12 dynamic SVG templates
 - Character reference management (up to 5 characters per subscription tier)
-- Real-time AI image generation with Google Vertex AI
+- Real-time AI image generation with Google AI Studio
 - **AI Script Generation**: Automatically generates Korean webtoon scripts with character mapping
 - **Character Auto-Selection**: Automatically selects appropriate characters per panel based on AI script
 - **Ratio-Specific References**: Uses 1:1 or 4:5 ratio images based on canvas selection
@@ -113,7 +113,7 @@ npx tsx <script>        # Run TypeScript files directly
 #### AI Integration
 - **Image Generation**: `/api/ai/generate` (single panel) and `/api/ai/generate-batch` (multiple panels)
 - **Script Generation**: `/api/ai/generate-script`
-- Uses Google Vertex AI (Gemini 2.5 Flash Image Preview) with @google/genai SDK
+- Uses Google AI Studio (Gemini 2.5 Flash Image Preview) with @google/genai SDK and simple API Key authentication
 - **Character Consistency**: Ratio-specific reference images with 3-image multimodal limit
 - **Multi-Character Support**: Enhanced prompts for balanced representation of multiple characters
 - **Panel Continuity**: `editImageNanoBananaMCP` method for consistent panel-to-panel transitions
@@ -141,22 +141,8 @@ npx tsx <script>        # Run TypeScript files directly
 
 Required in `.env.local`:
 ```env
-# Google Vertex AI
-GOOGLE_CLOUD_PROJECT_ID=
-GOOGLE_CLOUD_LOCATION=global
-
-# Local Development (file path)
-GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
-
-# Vercel Production (individual environment variables - recommended)
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...your-private-key...\n-----END PRIVATE KEY-----\n"
-GOOGLE_PRIVATE_KEY_ID=your-private-key-id
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/...
-
-# Backup JSON method (for compatibility)
-GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account",...}
+# Google AI Studio (Simple API Key - recommended for Vercel)
+GOOGLE_AI_API_KEY=your-api-key-from-aistudio.google.com
 
 # Supabase
 DATABASE_URL=postgresql://...
@@ -197,7 +183,7 @@ Recent optimizations implemented:
 
 ### Character Reference System & Multimodal AI
 - **Ratio-Specific References**: 1:1 canvas uses square images, 4:5 canvas uses portrait images
-- **Multimodal Limits**: Maximum 3 reference images per AI generation (Vertex AI constraint)
+- **Multimodal Limits**: Maximum 3 reference images per AI generation (Gemini API constraint)
 - **Character Distribution**: 1 reference image per character, supports up to 3 characters simultaneously
 - **Smart Selection**: Automatically selects best ratio-specific image for each character
 - **Multi-Character Consistency**: Enhanced prompts ensure all characters appear with equal attention and accurate representation
@@ -258,11 +244,11 @@ If Prisma can't connect to Supabase:
 ## Development Guidelines
 
 ### AI Integration
-- Always use real Vertex AI token counts for accurate billing
+- Always use real Gemini API token counts for accurate billing
 - In development mode, bypass authentication but still track token usage
 - Character auto-selection should work seamlessly with AI script generation
 - Ensure ratio-specific character reference images are sent correctly
-- **Multimodal Constraints**: Respect 3-image limit for Vertex AI multimodal prompts
+- **Multimodal Constraints**: Respect 3-image limit for Gemini API multimodal prompts
 - **Character Balance**: Use enhanced prompts for multi-character scenarios to ensure equal representation
 - **nanobananaMCP Method**: Use `editImageNanoBananaMCP` for panel-to-panel continuity editing
 

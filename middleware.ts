@@ -11,6 +11,11 @@ import type { NextRequest } from 'next/server'
 // import { SecureLogger } from '@/lib/utils/secure-logger'
 
 export async function middleware(request: NextRequest) {
+  // 🔥 CRITICAL: Vercel 빌드 타임에는 middleware 완전 비활성화
+  // Collecting page data 단계에서 self is not defined 에러 방지
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return NextResponse.next();
+  }
   const startTime = Date.now();
   const { pathname } = new URL(request.url);
   const method = request.method;

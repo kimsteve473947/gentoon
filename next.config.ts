@@ -120,11 +120,26 @@ const nextConfig: NextConfig = {
   
   // Webpack 설정
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
+    // 🔥 CRITICAL: Supabase 패키지를 서버 빌드에서 완전히 제외
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@supabase/ssr': 'commonjs @supabase/ssr',
+        '@supabase/supabase-js': 'commonjs @supabase/supabase-js',
+        '@supabase/realtime-js': 'commonjs @supabase/realtime-js',
+        '@supabase/postgrest-js': 'commonjs @supabase/postgrest-js',
+        '@supabase/storage-js': 'commonjs @supabase/storage-js',
+        '@supabase/functions-js': 'commonjs @supabase/functions-js',
+        '@supabase/auth-js': 'commonjs @supabase/auth-js',
+        '@supabase/gotrue-js': 'commonjs @supabase/gotrue-js',
+      });
+    }
+
     // 개발 환경에서 빌드 속도 향상
     if (process.env.NODE_ENV === 'development') {
       config.optimization.minimize = false;
     }
-    
+
     // 프로덕션 최적화
     if (process.env.NODE_ENV === 'production') {
       config.optimization.splitChunks = {

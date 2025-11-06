@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { Metadata } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles, Zap, Shield, Star, Users, Check, Coins, ChevronRight } from "lucide-react";

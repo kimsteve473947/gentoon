@@ -28,7 +28,6 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       '@radix-ui',
       'lucide-react',
-      '@supabase/supabase-js',
       'zustand',
       'framer-motion',
       'react-hook-form',
@@ -37,7 +36,8 @@ const nextConfig: NextConfig = {
   },
 
   // ⚠️ Move serverComponentsExternalPackages to top level (Next.js 15 change)
-  serverExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas', '@supabase/ssr', '@supabase/supabase-js'],
+  // Supabase packages marked as external to avoid Edge Runtime issues
+  serverExternalPackages: ['sharp', '@img/sharp-libvips-dev', 'canvas', '@supabase/ssr', '@supabase/supabase-js', '@supabase/realtime-js'],
   
   // 워크스페이스 루트 설정 (경고 해결)
   outputFileTracingRoot: process.cwd(),

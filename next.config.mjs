@@ -24,6 +24,9 @@ const nextConfig = {
 
   // 🔥 CRITICAL FIX: Next.js 14 settings
   experimental: {
+    // ✅ Enable instrumentation for early polyfill injection
+    instrumentationHook: true,
+
     optimizePackageImports: [
       '@radix-ui',
       'lucide-react',

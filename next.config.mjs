@@ -3,7 +3,7 @@ import crypto from 'crypto'
 const nextConfig = {
   // Vercel 배포 최적화
   // 🔥 CRITICAL: standalone 모드로 정적 페이지 생성 스킵
-  output: 'standalone',
+  // output: 'standalone', // 주석 처리하여 기본 빌드 모드 사용
 
   // ESLint 설정 (빌드 시 경고 허용)
   eslint: {

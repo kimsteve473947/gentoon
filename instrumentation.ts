@@ -4,24 +4,20 @@
  * Reference: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
-export async function register() {
-  // Node.js runtime only
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // Polyfill global.self for Supabase SSR
-    if (typeof global.self === 'undefined') {
-      (global as any).self = global
-    }
+// Apply polyfills immediately at module load time
+if (typeof global.self === 'undefined') {
+  (global as any).self = global
+}
 
-    // Add window polyfill
-    if (typeof (global as any).window === 'undefined') {
-      (global as any).window = global
-    }
+if (typeof (global as any).window === 'undefined') {
+  (global as any).window = global
+}
 
-    // Add document polyfill
-    if (typeof (global as any).document === 'undefined') {
-      (global as any).document = {}
-    }
+if (typeof (global as any).document === 'undefined') {
+  (global as any).document = {}
+}
 
-    console.log('✅ [Instrumentation] Global polyfills loaded')
-  }
+export function register() {
+  // Polyfills are already applied at module load
+  console.log('✅ [Instrumentation] Global polyfills active')
 }

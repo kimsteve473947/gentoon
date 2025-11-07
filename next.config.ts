@@ -1,6 +1,7 @@
+import type { NextConfig } from 'next'
 import crypto from 'crypto'
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   // Vercel 배포 최적화
   // 🔥 CRITICAL: output 제거 - standalone 모드가 Collecting page data 에러 유발
   // output: 'standalone',
@@ -22,7 +23,7 @@ const nextConfig = {
 
   // ✅ 정적 최적화 완전 비활성화 (Supabase SSR과 Edge Runtime 호환성 문제 해결)
 
-  // 🔥 CRITICAL FIX: Next.js 14 experimental settings
+  // 🔥 CRITICAL FIX: Next.js 15 settings
   experimental: {
     optimizePackageImports: [
       '@radix-ui',
@@ -32,21 +33,22 @@ const nextConfig = {
       'react-hook-form',
       '@tanstack/react-query'
     ],
-    // Next.js 14에서는 serverComponentsExternalPackages를 experimental 안에
-    serverComponentsExternalPackages: [
-      'sharp',
-      '@img/sharp-libvips-dev',
-      'canvas',
-      '@supabase/ssr',
-      '@supabase/supabase-js',
-      '@supabase/realtime-js',
-      '@supabase/postgrest-js',
-      '@supabase/storage-js',
-      '@supabase/functions-js',
-      '@supabase/auth-js',
-      '@supabase/gotrue-js'
-    ],
   },
+
+  // Next.js 15: serverExternalPackages를 top level로
+  serverExternalPackages: [
+    'sharp',
+    '@img/sharp-libvips-dev',
+    'canvas',
+    '@supabase/ssr',
+    '@supabase/supabase-js',
+    '@supabase/realtime-js',
+    '@supabase/postgrest-js',
+    '@supabase/storage-js',
+    '@supabase/functions-js',
+    '@supabase/auth-js',
+    '@supabase/gotrue-js'
+  ],
 
   // 🔥 CRITICAL: 빌드 타임 정적 생성 완전 비활성화
   skipTrailingSlashRedirect: true,

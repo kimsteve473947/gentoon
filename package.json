@@ -55,7 +55,7 @@
     "google-auth-library": "^10.3.0",
     "konva": "^9.3.22",
     "lucide-react": "^0.542.0",
-    "next": "^14.2.18",
+    "next": "^15.0.3",
     "prisma": "^6.15.0",
     "react": "19.1.0",
     "react-dnd": "^16.0.1",

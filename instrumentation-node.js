@@ -12,7 +12,29 @@ if (typeof global.window === 'undefined') {
 }
 
 if (typeof global.document === 'undefined') {
-  global.document = {}
+  // Create a more complete document polyfill for styled-jsx
+  global.document = {
+    querySelector: function() { return null },
+    querySelectorAll: function() { return [] },
+    getElementsByTagName: function() { return [] },
+    getElementById: function() { return null },
+    createElement: function() {
+      return {
+        setAttribute: function() {},
+        appendChild: function() {},
+        style: {}
+      }
+    },
+    createTextNode: function() { return {} },
+    head: {
+      appendChild: function() {},
+      insertBefore: function() {}
+    },
+    body: {
+      appendChild: function() {},
+      insertBefore: function() {}
+    }
+  }
 }
 
 console.log('✅ [Pre-load] Global polyfills loaded via --require')

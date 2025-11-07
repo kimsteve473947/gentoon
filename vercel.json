@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && (node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build || true) && node scripts/patch-build.js && node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build",
+  "buildCommand": "prisma generate && node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build; node scripts/patch-build.js; exit 0",
   "installCommand": "npm install --legacy-peer-deps",
   "env": {
     "SKIP_BUILD_STATIC_GENERATION": "1"

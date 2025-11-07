@@ -34,18 +34,19 @@ const nextConfig = {
     ],
     // Next.js 14: serverComponentsExternalPackages를 experimental 안에
     serverComponentsExternalPackages: [
-    'sharp',
-    '@img/sharp-libvips-dev',
-    'canvas',
-    '@supabase/ssr',
-    '@supabase/supabase-js',
-    '@supabase/realtime-js',
-    '@supabase/postgrest-js',
-    '@supabase/storage-js',
-    '@supabase/functions-js',
-    '@supabase/auth-js',
-    '@supabase/gotrue-js'
-  ],
+      'sharp',
+      '@img/sharp-libvips-dev',
+      'canvas',
+      '@supabase/ssr',
+      '@supabase/supabase-js',
+      '@supabase/realtime-js',
+      '@supabase/postgrest-js',
+      '@supabase/storage-js',
+      '@supabase/functions-js',
+      '@supabase/auth-js',
+      '@supabase/gotrue-js'
+    ],
+  },
 
   // 🔥 CRITICAL: 빌드 타임 정적 생성 완전 비활성화
   skipTrailingSlashRedirect: true,

@@ -33,16 +33,32 @@ if (fs.existsSync(webpackRuntimePath)) {
   let content = fs.readFileSync(webpackRuntimePath, 'utf8');
 
   // Fix the specific error: Cannot read properties of undefined (reading 'length')
-  // Replace array.reduce without null check with one that has it
+  // Add comprehensive null checks for array operations
+
+  // Fix .reduce calls
   content = content.replace(
-    /function\s*\(([^)]*)\)\s*{\s*return\s+([^.]+)\.reduce\(/g,
-    'function($1) { return ($2 || []).reduce('
+    /\.reduce\(/g,
+    ' && Array.isArray(arguments[0]) ? arguments[0].reduce('
+  );
+  content = content.replace(
+    'arguments[0] && Array.isArray(arguments[0]) ? arguments[0].reduce(',
+    '.reduce('
+  );
+  content = content.replace(
+    /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\.reduce\(/g,
+    '($1||[]).reduce('
   );
 
-  // Also add safety check for map
+  // Fix .map calls
   content = content.replace(
-    /function\s*\(([^)]*)\)\s*{\s*return\s+([^.]+)\.map\(/g,
-    'function($1) { return ($2 || []).map('
+    /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\.map\(/g,
+    '($1||[]).map('
+  );
+
+  // Fix .length access
+  content = content.replace(
+    /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\.length/g,
+    '($1||[]).length'
   );
 
   fs.writeFileSync(webpackRuntimePath, content, 'utf8');

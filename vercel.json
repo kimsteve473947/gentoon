@@ -1,6 +1,6 @@
 {
   "buildCommand": "prisma generate && node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "functions": {
     "app/api/cron/billing/route.ts": {
       "maxDuration": 300

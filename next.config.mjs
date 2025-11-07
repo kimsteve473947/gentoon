@@ -1,6 +1,6 @@
-import type { NextConfig } from "next";
+import crypto from 'crypto'
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   // Vercel 배포 최적화
   // 🔥 CRITICAL: output 제거 - standalone 모드가 Collecting page data 에러 유발
   // output: 'standalone',
@@ -22,11 +22,8 @@ const nextConfig: NextConfig = {
 
   // ✅ 정적 최적화 완전 비활성화 (Supabase SSR과 Edge Runtime 호환성 문제 해결)
 
-  // 🔥 CRITICAL FIX: 페이지 정적 생성 완전 비활성화
-  // 이렇게 하면 "Collecting page data" 단계를 스킵하여 Supabase SSR 에러 방지
-  // PPR (Partial Prerendering) 완전 비활성화 - Next.js 15의 새로운 기능이 Supabase와 충돌하므로 비활성화
+  // 🔥 CRITICAL FIX: Next.js 14 experimental settings
   experimental: {
-    // dynamicIO: true, // Next.js 15 canary only - 제거
     optimizePackageImports: [
       '@radix-ui',
       'lucide-react',
@@ -35,35 +32,25 @@ const nextConfig: NextConfig = {
       'react-hook-form',
       '@tanstack/react-query'
     ],
-    // 🎯 모든 페이지를 동적 렌더링으로 강제
-    isrMemoryCacheSize: 0, // ISR 캐시 비활성화
-    // 정적 페이지 미리 렌더링 완전 비활성화
-    staticPageGenerationTimeout: 0,
+    // Next.js 14에서는 serverComponentsExternalPackages를 experimental 안에
+    serverComponentsExternalPackages: [
+      'sharp',
+      '@img/sharp-libvips-dev',
+      'canvas',
+      '@supabase/ssr',
+      '@supabase/supabase-js',
+      '@supabase/realtime-js',
+      '@supabase/postgrest-js',
+      '@supabase/storage-js',
+      '@supabase/functions-js',
+      '@supabase/auth-js',
+      '@supabase/gotrue-js'
+    ],
   },
 
   // 🔥 CRITICAL: 빌드 타임 정적 생성 완전 비활성화
-  // "Collecting page data" 단계를 스킵하여 Supabase SSR 에러 방지
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
-
-  // ⚠️ Move serverComponentsExternalPackages to top level (Next.js 15 change)
-  // Supabase packages marked as external to avoid Edge Runtime issues
-  serverExternalPackages: [
-    'sharp',
-    '@img/sharp-libvips-dev',
-    'canvas',
-    '@supabase/ssr',
-    '@supabase/supabase-js',
-    '@supabase/realtime-js',
-    '@supabase/postgrest-js',
-    '@supabase/storage-js',
-    '@supabase/functions-js',
-    '@supabase/auth-js',
-    '@supabase/gotrue-js'
-  ],
-  
-  // 워크스페이스 루트 설정 (경고 해결)
-  outputFileTracingRoot: process.cwd(),
   
   // 이미지 최적화
   images: {
@@ -127,7 +114,7 @@ const nextConfig: NextConfig = {
   },
   
   // Webpack 설정
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+  webpack: (config, { isServer }) => {
     // 🔥 CRITICAL: Supabase 패키지를 서버 빌드에서 완전히 제외
     if (isServer) {
       // 기존 externals 배열 방식 유지하되, Supabase 패키지 추가
@@ -159,12 +146,12 @@ const nextConfig: NextConfig = {
             enforce: true,
           },
           lib: {
-            test(module: any) {
+            test(module) {
               return module.size() > 160000 &&
                 /node_modules[/\\]/.test(module.identifier());
             },
-            name(module: any) {
-              const hash = require('crypto').createHash('sha1');
+            name(module) {
+              const hash = crypto.createHash('sha1');
               hash.update(module.identifier());
               return hash.digest('hex').substring(0, 8);
             },
@@ -178,7 +165,7 @@ const nextConfig: NextConfig = {
             priority: 20,
           },
           shared: {
-            name(module: any, chunks: any) {
+            name(module, chunks) {
               return 'shared';
             },
             priority: 10,

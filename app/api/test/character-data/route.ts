@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     
     // 캐릭터 데이터 조회 - 정확한 이름 매칭
-    const { data: characters, error } = await supabase
+    let { data: characters, error } = await supabase
       .from('character')
       .select('*')
       .eq('name', characterName)

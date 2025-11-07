@@ -57,7 +57,6 @@ import {
   AlignRight,
   AlignJustify,
   Heart,
-  ChevronDown,
   ArrowUpDown,
   ChevronRight
 } from "lucide-react";

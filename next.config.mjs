@@ -134,47 +134,13 @@ const nextConfig = {
       config.optimization.minimize = false;
     }
 
-    // 프로덕션 최적화
+      // 프로덕션 최적화 - 단순화된 code splitting
     if (process.env.NODE_ENV === 'production') {
       config.optimization.splitChunks = {
         chunks: 'all',
         cacheGroups: {
           default: false,
-          vendors: false,
-          framework: {
-            name: 'framework',
-            chunks: 'all',
-            test: /(?<!node_modules.*)[\\/]node_modules[\\/](react|react-dom|scheduler|prop-types|use-subscription)[\\/]/,
-            priority: 40,
-            enforce: true,
-          },
-          lib: {
-            test(module) {
-              return module.size() > 160000 &&
-                /node_modules[/\\]/.test(module.identifier());
-            },
-            name(module) {
-              const hash = crypto.createHash('sha1');
-              hash.update(module.identifier());
-              return hash.digest('hex').substring(0, 8);
-            },
-            priority: 30,
-            minChunks: 1,
-            reuseExistingChunk: true,
-          },
-          commons: {
-            name: 'commons',
-            minChunks: 2,
-            priority: 20,
-          },
-          shared: {
-            name(module, chunks) {
-              return 'shared';
-            },
-            priority: 10,
-            minChunks: 2,
-            reuseExistingChunk: true,
-          },
+          vendors: false
         },
       };
     }

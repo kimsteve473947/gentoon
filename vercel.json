@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && next build",
+  "buildCommand": "prisma generate && node --require ./instrumentation-node.js ./node_modules/.bin/next build",
   "installCommand": "npm install --legacy-peer-deps",
   "env": {
     "SKIP_BUILD_STATIC_GENERATION": "1"

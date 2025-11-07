@@ -1,10 +1,9 @@
-import type { NextConfig } from 'next'
 import crypto from 'crypto'
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   // Vercel 배포 최적화
-  // 🔥 CRITICAL: output 제거 - standalone 모드가 Collecting page data 에러 유발
-  // output: 'standalone',
+  // 🔥 CRITICAL: standalone 모드로 정적 페이지 생성 스킵
+  output: 'standalone',
 
   // ESLint 설정 (빌드 시 경고 허용)
   eslint: {
@@ -23,7 +22,7 @@ const nextConfig: NextConfig = {
 
   // ✅ 정적 최적화 완전 비활성화 (Supabase SSR과 Edge Runtime 호환성 문제 해결)
 
-  // 🔥 CRITICAL FIX: Next.js 15 settings
+  // 🔥 CRITICAL FIX: Next.js 14 settings
   experimental: {
     optimizePackageImports: [
       '@radix-ui',
@@ -33,10 +32,8 @@ const nextConfig: NextConfig = {
       'react-hook-form',
       '@tanstack/react-query'
     ],
-  },
-
-  // Next.js 15: serverExternalPackages를 top level로
-  serverExternalPackages: [
+    // Next.js 14: serverComponentsExternalPackages를 experimental 안에
+    serverComponentsExternalPackages: [
     'sharp',
     '@img/sharp-libvips-dev',
     'canvas',

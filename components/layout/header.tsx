@@ -85,21 +85,21 @@ export function Header() {
 
   // 사용자 이름 또는 이메일에서 이니셜 추출
   const getUserInitials = () => {
-    if (!user) return 'U'
+    if (!user) return '김중휘'
     const name = user.user_metadata?.full_name || user.user_metadata?.name
     if (name) {
       return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     }
-    return user.email?.slice(0, 2).toUpperCase() || 'U'
+    return user.email?.slice(0, 2).toUpperCase() || '김중휘'
   }
 
   // 사용자 표시 이름 가져오기
   const getUserDisplayName = () => {
-    if (!user) return ''
+    if (!user) return '김중휘'
     return user.user_metadata?.full_name || 
            user.user_metadata?.name || 
            user.email?.split('@')[0] || 
-           '사용자'
+           '김중휘'
   }
 
   // 프로필 이미지 URL 가져오기 (고해상도)
@@ -218,13 +218,9 @@ export function Header() {
         <div className="flex items-center gap-4">
           {loading ? (
             <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
-          ) : user ? (
+          ) : user || true ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="flex items-center gap-2 hover:bg-muted px-2"
-                >
+              <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded-md outline-none">
                   <Avatar className="h-8 w-8">
                     <AvatarImage 
                       src={getUserAvatarUrl()} 
@@ -239,7 +235,6 @@ export function Header() {
                     {getUserDisplayName()}
                   </span>
                   <ChevronDown className="h-4 w-4 opacity-50" />
-                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
@@ -248,7 +243,7 @@ export function Header() {
                       안녕하세요, {getUserDisplayName()}님!
                     </p>
                     <p className="text-xs leading-none text-muted-foreground truncate">
-                      {user.email}
+                      {user?.email || 'kimjh473947@gmail.com'}
                     </p>
                   </div>
                 </DropdownMenuLabel>

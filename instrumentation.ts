@@ -9,9 +9,10 @@ if (typeof global.self === 'undefined') {
   (global as any).self = global
 }
 
-if (typeof (global as any).window === 'undefined') {
-  (global as any).window = global
-}
+// Temporarily disable window polyfill to debug location issue
+// if (typeof (global as any).window === 'undefined') {
+//   (global as any).window = global
+// }
 
 if (typeof (global as any).document === 'undefined') {
   (global as any).document = {}

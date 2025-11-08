@@ -31,15 +31,46 @@ export class NanoBananaService {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required");
     }
 
-    console.log('🔧 Vertex AI 초기화:', { projectId, location });
+    // Vercel 환경: 환경변수로 credentials 객체 생성
+    const hasServiceAccountEnv = !!(
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      process.env.GOOGLE_PRIVATE_KEY
+    );
 
-    // GoogleGenAI 초기화 - 로컬/프로덕션 모두 동일하게 처리
-    this.genAI = new GoogleGenAI({
+    let genAIConfig: any = {
       vertexai: true,
       project: projectId,
       location: location
-    });
+    };
 
+    if (hasServiceAccountEnv) {
+      // Vercel: credentials를 직접 전달
+      const privateKey = process.env.GOOGLE_PRIVATE_KEY!.includes('\\n')
+        ? process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n')
+        : process.env.GOOGLE_PRIVATE_KEY!;
+
+      genAIConfig.googleAuthOptions = {
+        credentials: {
+          type: "service_account",
+          project_id: projectId,
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: privateKey,
+          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: "https://accounts.google.com/o/oauth2/auth",
+          token_uri: "https://oauth2.googleapis.com/token",
+          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
+          universe_domain: "googleapis.com"
+        }
+      };
+      console.log('🔑 Vercel 환경: Service Account credentials 설정');
+    } else {
+      // 로컬: GOOGLE_APPLICATION_CREDENTIALS 환경변수 사용
+      console.log('🔑 로컬 환경: GOOGLE_APPLICATION_CREDENTIALS 사용');
+    }
+
+    this.genAI = new GoogleGenAI(genAIConfig);
     this.webpOptimizer = new WebPOptimizer();
     console.log('✅ Vertex AI 초기화 완료');
   }

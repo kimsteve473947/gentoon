@@ -630,6 +630,19 @@ export class TokenManager {
       });
 
       const userPlan = subscription?.plan || 'FREE';
+
+      // 🔥 ADMIN 계정은 무제한 토큰 반환
+      if (userPlan === 'ADMIN') {
+        const adminResult = {
+          remainingTokens: subscription?.imageTokensTotal || 999999999,
+          usedThisMonth: subscription?.imageTokensUsed || 0,
+          monthlyLimit: subscription?.imageTokensTotal || 999999999,
+          userPlan: 'ADMIN',
+        };
+        console.log('✅ [getImageGenerationBalance] ADMIN 계정 - 무제한 반환:', adminResult);
+        return adminResult;
+      }
+
       const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.FREE;
       const monthlyLimit = subscription?.imageTokensTotal || planConfig.imageTokens || 0;
       const usedThisMonth = subscription?.imageTokensUsed || 0;

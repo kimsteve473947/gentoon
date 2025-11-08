@@ -26,6 +26,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
@@ -39,13 +40,24 @@ export function Header() {
   useEffect(() => {
     if (!mounted) return
 
-    // 사용자 정보 가져오기
+    // 사용자 정보 및 role 가져오기
     const getUser = async () => {
       try {
         // 실제 사용자 인증 확인
-
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
+
+        // 데이터베이스에서 사용자 role 가져오기
+        if (user) {
+          const { data: userData } = await supabase
+            .from('user')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+          setUserRole(userData?.role || 'USER')
+          console.log('👤 User role from DB:', userData?.role)
+        }
       } catch (error) {
         console.error('Error fetching user:', error)
       } finally {
@@ -56,8 +68,21 @@ export function Header() {
     getUser()
 
     // 인증 상태 변경 리스너
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+
+      // role 다시 가져오기
+      if (session?.user) {
+        const { data: userData } = await supabase
+          .from('user')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        setUserRole(userData?.role || 'USER')
+      } else {
+        setUserRole(null)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -145,10 +170,9 @@ export function Header() {
     return null
   }
 
-  // 관리자 권한 확인
+  // 관리자 권한 확인 - DB의 role 필드 사용
   const isAdmin = () => {
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
-    return user?.email === adminEmail
+    return userRole === 'ADMIN'
   }
 
   // 특정 페이지에서는 헤더를 숨김

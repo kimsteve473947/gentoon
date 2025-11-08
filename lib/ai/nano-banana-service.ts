@@ -35,8 +35,11 @@ export class NanoBananaService {
     console.log('✅ Google AI Studio API Key 로드 성공');
 
     // Google AI Studio 방식으로 초기화 (API Key만 필요)
+    // project/location을 null로 명시하여 Google AI Studio endpoint 강제 사용
     this.genAI = new GoogleGenAI({
-      apiKey: apiKey
+      apiKey: apiKey,
+      project: null, // Vertex AI 사용 안 함
+      location: null  // Google AI Studio generativelanguage.googleapis.com 사용
     });
 
     this.webpOptimizer = new WebPOptimizer();

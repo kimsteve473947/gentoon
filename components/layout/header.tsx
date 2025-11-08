@@ -45,7 +45,12 @@ export function Header() {
       try {
         // 실제 사용자 인증 확인
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('🔍 [Header] User from Supabase:', user)
         setUser(user)
+
+        // 🔥 CRITICAL: 사용자 정보를 가져왔으면 바로 loading false로 설정
+        // role은 백그라운드에서 가져와도 됨
+        setLoading(false)
 
         // 데이터베이스에서 사용자 role 가져오기
         if (user) {
@@ -70,7 +75,6 @@ export function Header() {
         }
       } catch (error) {
         console.error('Error fetching user:', error)
-      } finally {
         setLoading(false)
       }
     }
@@ -260,9 +264,11 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          {loading ? (
-            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
-          ) : user ? (
+          {(() => {
+            console.log('🔍 [Header Render] loading:', loading, 'user:', user, 'userRole:', userRole)
+            return loading ? (
+              <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+            ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded-md outline-none">
                   <Avatar className="h-8 w-8">
@@ -331,7 +337,8 @@ export function Header() {
                 </Link>
               </Button>
             </div>
-          )}
+          )
+          })()}
         </div>
       </div>
     </header>

@@ -47,20 +47,25 @@ export function Header() {
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
 
-        // 사용자 role 조회
-        if (user) {
-          const { data: userData } = await supabase
-            .from('user')
-            .select('role')
-            .eq('id', user.id)
-            .single()
+        // ✅ user 로드 완료 즉시 loading false로 변경 (UI 바로 표시)
+        setLoading(false)
 
-          setUserRole(userData?.role || null)
+        // 사용자 role API로 조회 (백그라운드에서 로드)
+        if (user) {
+          try {
+            const response = await fetch('/api/user/role')
+            if (response.ok) {
+              const { role } = await response.json()
+              setUserRole(role)
+            }
+          } catch (roleError) {
+            console.error('Error fetching user role:', roleError)
+            setUserRole(null)
+          }
         }
       } catch (error) {
         console.error('Error fetching user:', error)
-      } finally {
-        setLoading(false)
+        setLoading(false) // 에러 시에도 loading 해제
       }
     }
 
@@ -70,15 +75,18 @@ export function Header() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
 
-      // role도 다시 조회
+      // role도 API로 다시 조회 (백그라운드)
       if (session?.user) {
-        const { data: userData } = await supabase
-          .from('user')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        setUserRole(userData?.role || null)
+        try {
+          const response = await fetch('/api/user/role')
+          if (response.ok) {
+            const { role } = await response.json()
+            setUserRole(role)
+          }
+        } catch (roleError) {
+          console.error('Error fetching user role:', roleError)
+          setUserRole(null)
+        }
       } else {
         setUserRole(null)
       }

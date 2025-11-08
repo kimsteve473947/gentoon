@@ -40,41 +40,32 @@ export function Header() {
   useEffect(() => {
     if (!mounted) return
 
-    // 사용자 정보 및 role 가져오기
+    // 사용자 정보 가져오기
     const getUser = async () => {
       try {
         // 실제 사용자 인증 확인
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('🔍 [Header] User from Supabase:', user)
         setUser(user)
 
-        // 🔥 CRITICAL: 사용자 정보를 가져왔으면 바로 loading false로 설정
-        // role은 백그라운드에서 가져와도 됨
-        setLoading(false)
-
-        // 데이터베이스에서 사용자 role 가져오기
+        // 데이터베이스에서 사용자 role 가져오기 (백그라운드에서 실행)
         if (user) {
-          try {
-            const { data: userData, error } = await supabase
-              .from('user')
-              .select('role')
-              .eq('id', user.id)
-              .single()
-
-            if (error) {
-              console.error('Error fetching user role:', error)
-              setUserRole('USER') // 기본값
-            } else {
-              setUserRole(userData?.role || 'USER')
-              console.log('👤 User role from DB:', userData?.role)
-            }
-          } catch (roleError) {
-            console.error('Error in role fetch:', roleError)
-            setUserRole('USER') // 에러 시 기본값
-          }
+          supabase
+            .from('user')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+            .then(({ data: userData, error }) => {
+              if (!error && userData) {
+                setUserRole(userData.role || 'USER')
+              } else {
+                setUserRole('USER')
+              }
+            })
+            .catch(() => setUserRole('USER'))
         }
       } catch (error) {
         console.error('Error fetching user:', error)
+      } finally {
         setLoading(false)
       }
     }
@@ -88,20 +79,13 @@ export function Header() {
       // role 다시 가져오기
       if (session?.user) {
         try {
-          const { data: userData, error } = await supabase
+          const { data: userData } = await supabase
             .from('user')
             .select('role')
             .eq('id', session.user.id)
             .single()
-
-          if (error) {
-            console.error('Error fetching user role on auth change:', error)
-            setUserRole('USER')
-          } else {
-            setUserRole(userData?.role || 'USER')
-          }
-        } catch (roleError) {
-          console.error('Error in role fetch on auth change:', roleError)
+          setUserRole(userData?.role || 'USER')
+        } catch {
           setUserRole('USER')
         }
       } else {
@@ -134,21 +118,21 @@ export function Header() {
 
   // 사용자 이름 또는 이메일에서 이니셜 추출
   const getUserInitials = () => {
-    if (!user) return 'U'
+    if (!user) return '김중휘'
     const name = user.user_metadata?.full_name || user.user_metadata?.name
     if (name) {
       return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     }
-    return user.email?.slice(0, 2).toUpperCase() || 'U'
+    return user.email?.slice(0, 2).toUpperCase() || '김중휘'
   }
 
   // 사용자 표시 이름 가져오기
   const getUserDisplayName = () => {
-    if (!user) return 'User'
-    return user.user_metadata?.full_name ||
-           user.user_metadata?.name ||
-           user.email?.split('@')[0] ||
-           'User'
+    if (!user) return '김중휘'
+    return user.user_metadata?.full_name || 
+           user.user_metadata?.name || 
+           user.email?.split('@')[0] || 
+           '김중휘'
   }
 
   // 프로필 이미지 URL 가져오기 (고해상도)
@@ -194,7 +178,7 @@ export function Header() {
     return null
   }
 
-  // 관리자 권한 확인 - DB의 role 필드 사용
+  // 관리자 권한 확인
   const isAdmin = () => {
     return userRole === 'ADMIN'
   }
@@ -202,6 +186,29 @@ export function Header() {
   // 특정 페이지에서는 헤더를 숨김
   const hideHeader = ['/sign-in', '/sign-up', '/studio'].includes(pathname)
   if (hideHeader) return null
+
+  // 클라이언트에서만 렌더링
+  if (!mounted) {
+    return (
+      <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="flex items-center gap-2">
+              <img 
+                src="/gentoon.webp" 
+                alt="GenToon" 
+                className="h-10 w-10 object-contain"
+              />
+              <span className="text-2xl font-bold">GenToon</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+          </div>
+        </div>
+      </header>
+    )
+  }
 
   return (
     <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
@@ -268,7 +275,7 @@ export function Header() {
                       안녕하세요, {getUserDisplayName()}님!
                     </p>
                     <p className="text-xs leading-none text-muted-foreground truncate">
-                      {user?.email}
+                      {user?.email || 'kimjh473947@gmail.com'}
                     </p>
                   </div>
                 </DropdownMenuLabel>

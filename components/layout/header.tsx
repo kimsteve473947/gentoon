@@ -26,7 +26,6 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
@@ -44,25 +43,9 @@ export function Header() {
     const getUser = async () => {
       try {
         // 실제 사용자 인증 확인
+
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
-
-        // 데이터베이스에서 사용자 role 가져오기 (백그라운드에서 실행)
-        if (user) {
-          supabase
-            .from('user')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-            .then(({ data: userData, error }) => {
-              if (!error && userData) {
-                setUserRole(userData.role || 'USER')
-              } else {
-                setUserRole('USER')
-              }
-            })
-            .catch(() => setUserRole('USER'))
-        }
       } catch (error) {
         console.error('Error fetching user:', error)
       } finally {
@@ -73,28 +56,12 @@ export function Header() {
     getUser()
 
     // 인증 상태 변경 리스너
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-
-      // role 다시 가져오기
-      if (session?.user) {
-        try {
-          const { data: userData } = await supabase
-            .from('user')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          setUserRole(userData?.role || 'USER')
-        } catch {
-          setUserRole('USER')
-        }
-      } else {
-        setUserRole(null)
-      }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase, mounted])
+  }, [mounted])
 
   const handleSignOut = async () => {
     try {
@@ -180,7 +147,8 @@ export function Header() {
 
   // 관리자 권한 확인
   const isAdmin = () => {
-    return userRole === 'ADMIN'
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
+    return user?.email === adminEmail
   }
 
   // 특정 페이지에서는 헤더를 숨김
@@ -250,7 +218,7 @@ export function Header() {
         <div className="flex items-center gap-4">
           {loading ? (
             <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
-          ) : user ? (
+          ) : user || true ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded-md outline-none">
                   <Avatar className="h-8 w-8">

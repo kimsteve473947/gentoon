@@ -661,12 +661,57 @@ export class TokenManager {
     } catch (error) {
       console.error("❌ [getImageGenerationBalance] 에러 발생:", error);
       secureError("이미지 토큰 잔액 조회 오류", error);
-      return {
-        remainingTokens: 0,
-        usedThisMonth: 0,
-        monthlyLimit: 0,
-        userPlan: 'FREE',
-      };
+
+      // 🚨 Prisma 실패 시 Supabase 직접 쿼리로 재시도
+      try {
+        console.log('🔄 [getImageGenerationBalance] Supabase 직접 쿼리로 재시도...');
+        const supabase = await this.getSupabaseClient();
+        const { data: subscription, error: supabaseError } = await supabase
+          .from('subscription')
+          .select('plan, imageTokensTotal, imageTokensUsed')
+          .eq('userId', userId)
+          .single();
+
+        if (supabaseError || !subscription) {
+          console.error('❌ [getImageGenerationBalance] Supabase 쿼리도 실패:', supabaseError);
+          throw supabaseError || new Error('구독 정보 없음');
+        }
+
+        console.log('✅ [getImageGenerationBalance] Supabase 쿼리 성공:', subscription);
+
+        const userPlan = subscription.plan || 'FREE';
+
+        // ADMIN 계정은 무제한 토큰 반환
+        if (userPlan === 'ADMIN') {
+          const adminResult = {
+            remainingTokens: subscription.imageTokensTotal || 999999999,
+            usedThisMonth: subscription.imageTokensUsed || 0,
+            monthlyLimit: subscription.imageTokensTotal || 999999999,
+            userPlan: 'ADMIN',
+          };
+          console.log('✅ [getImageGenerationBalance] ADMIN 계정 - Supabase에서 무제한 반환:', adminResult);
+          return adminResult;
+        }
+
+        const monthlyLimit = subscription.imageTokensTotal || 0;
+        const usedThisMonth = subscription.imageTokensUsed || 0;
+        const remainingTokens = monthlyLimit - usedThisMonth;
+
+        return {
+          remainingTokens: Math.max(0, remainingTokens),
+          usedThisMonth,
+          monthlyLimit,
+          userPlan,
+        };
+      } catch (fallbackError) {
+        console.error("❌ [getImageGenerationBalance] Supabase 재시도도 실패:", fallbackError);
+        return {
+          remainingTokens: 0,
+          usedThisMonth: 0,
+          monthlyLimit: 0,
+          userPlan: 'FREE',
+        };
+      }
     }
   }
 

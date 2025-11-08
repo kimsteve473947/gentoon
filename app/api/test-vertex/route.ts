@@ -5,8 +5,8 @@ export async function GET() {
     // GoogleGenAI 초기화 테스트
     const { GoogleGenAI } = await import('@google/genai');
 
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-    const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID?.replace(/[\r\n]/g, '').trim();
+    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.replace(/[\r\n]/g, '').trim();
 
     console.log('🔍 Environment Check:');
     console.log('- GOOGLE_CLOUD_PROJECT_ID:', projectId ? `${projectId.substring(0, 10)}...` : 'MISSING');

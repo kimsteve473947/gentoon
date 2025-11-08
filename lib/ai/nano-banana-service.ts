@@ -25,8 +25,8 @@ export class NanoBananaService {
   
   constructor() {
     // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
-    const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.trim();
-    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.trim();
+    const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.replace(/[\r\n]/g, '').trim();
+    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.replace(/[\r\n]/g, '').trim();
 
     if (!projectId) {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");

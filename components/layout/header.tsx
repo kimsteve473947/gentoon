@@ -49,14 +49,24 @@ export function Header() {
 
         // 데이터베이스에서 사용자 role 가져오기
         if (user) {
-          const { data: userData } = await supabase
-            .from('user')
-            .select('role')
-            .eq('id', user.id)
-            .single()
+          try {
+            const { data: userData, error } = await supabase
+              .from('user')
+              .select('role')
+              .eq('id', user.id)
+              .single()
 
-          setUserRole(userData?.role || 'USER')
-          console.log('👤 User role from DB:', userData?.role)
+            if (error) {
+              console.error('Error fetching user role:', error)
+              setUserRole('USER') // 기본값
+            } else {
+              setUserRole(userData?.role || 'USER')
+              console.log('👤 User role from DB:', userData?.role)
+            }
+          } catch (roleError) {
+            console.error('Error in role fetch:', roleError)
+            setUserRole('USER') // 에러 시 기본값
+          }
         }
       } catch (error) {
         console.error('Error fetching user:', error)
@@ -73,13 +83,23 @@ export function Header() {
 
       // role 다시 가져오기
       if (session?.user) {
-        const { data: userData } = await supabase
-          .from('user')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
+        try {
+          const { data: userData, error } = await supabase
+            .from('user')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
 
-        setUserRole(userData?.role || 'USER')
+          if (error) {
+            console.error('Error fetching user role on auth change:', error)
+            setUserRole('USER')
+          } else {
+            setUserRole(userData?.role || 'USER')
+          }
+        } catch (roleError) {
+          console.error('Error in role fetch on auth change:', roleError)
+          setUserRole('USER')
+        }
       } else {
         setUserRole(null)
       }

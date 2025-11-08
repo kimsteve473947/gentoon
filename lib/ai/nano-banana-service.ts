@@ -32,10 +32,11 @@ export class NanoBananaService {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
     }
 
-    // @google/genai는 Application Default Credentials (ADC)를 사용
-    // 프로덕션에서는 환경변수를 통해 google-auth-library가 자동으로 credentials를 로드함
+    // @google/genai는 googleAuthOptions를 통해 credentials를 직접 전달받음
 
-    // 1. Vercel/프로덕션: 환경변수로 credentials 설정
+    // 1. Vercel/프로덕션: 환경변수로 credentials 객체 생성
+    let credentials: any = undefined;
+
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       try {
         console.log('🔑 Vercel 환경: Service Account credentials 설정 시작');
@@ -53,9 +54,8 @@ export class NanoBananaService {
           console.log('ℹ️ 이미 실제 개행문자 포함됨 (변환 불필요)');
         }
 
-        // GOOGLE_APPLICATION_CREDENTIALS_JSON 환경변수 동적 생성
-        // google-auth-library가 이 값을 읽어서 자동으로 인증
-        const credentials = {
+        // Credentials 객체 생성 - GoogleGenAI constructor에 직접 전달
+        credentials = {
           type: "service_account",
           project_id: projectId,
           private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
@@ -69,10 +69,7 @@ export class NanoBananaService {
           universe_domain: "googleapis.com"
         };
 
-        // google-auth-library가 사용할 수 있도록 환경변수에 설정
-        process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify(credentials);
-
-        console.log('✅ Credentials JSON 환경변수 설정 완료');
+        console.log('✅ Credentials 객체 생성 완료');
         console.log('📧 Service Account:', credentials.client_email);
         console.log('🔑 Private Key 시작:', credentials.private_key.substring(0, 27)); // "-----BEGIN PRIVATE KEY-----"
       } catch (error) {
@@ -87,12 +84,17 @@ export class NanoBananaService {
       console.log('📁 파일 경로:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
     }
 
-    // Vertex AI 초기화 (간소화된 방식)
-    // @google/genai는 자동으로 GOOGLE_APPLICATION_CREDENTIALS_JSON을 읽음
+    // Vertex AI 초기화 - credentials를 googleAuthOptions로 직접 전달
+    // ✅ CRITICAL FIX: Pass credentials via googleAuthOptions, not environment variables
     this.genAI = new GoogleGenAI({
       vertexai: true,  // ✅ Vertex AI 명시적 사용
       project: projectId,
-      location: location
+      location: location,
+      ...(credentials && {
+        googleAuthOptions: {
+          credentials: credentials
+        }
+      })
     });
 
     this.webpOptimizer = new WebPOptimizer();

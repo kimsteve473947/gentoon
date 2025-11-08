@@ -22,6 +22,8 @@ export async function GET() {
     }
 
     // Credentials 설정
+    let credentials: any = undefined;
+
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       const rawPrivateKey = process.env.GOOGLE_PRIVATE_KEY;
       let processedPrivateKey = rawPrivateKey;
@@ -30,7 +32,7 @@ export async function GET() {
         processedPrivateKey = rawPrivateKey.replace(/\\n/g, '\n');
       }
 
-      const credentials = {
+      credentials = {
         type: "service_account" as const,
         project_id: projectId,
         private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
@@ -44,15 +46,19 @@ export async function GET() {
         universe_domain: "googleapis.com"
       };
 
-      process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify(credentials);
-      console.log('✅ Credentials set in process.env');
+      console.log('✅ Credentials set up with googleAuthOptions');
     }
 
-    // GoogleGenAI 초기화
+    // GoogleGenAI 초기화 - credentials를 googleAuthOptions로 직접 전달
     const genAI = new GoogleGenAI({
       vertexai: true,
       project: projectId,
-      location: location
+      location: location,
+      ...(credentials && {
+        googleAuthOptions: {
+          credentials: credentials
+        }
+      })
     });
 
     console.log('✅ GoogleGenAI initialized successfully');

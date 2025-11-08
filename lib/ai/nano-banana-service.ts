@@ -807,8 +807,8 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
    */
   private async callGoogleAI(contents: any[]): Promise<any> {
     try {
-      console.log('🚀 Vertex AI SDK 호출 시작...', {
-        model: 'gemini-2.5-flash-image-preview',
+      console.log('🚀 Google AI Studio API 호출 시작...', {
+        model: 'gemini-2.5-flash-image',
         contentCount: contents.length,
         hasReferenceImages: contents.some(c => c.inlineData)
       });
@@ -823,15 +823,15 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
         }
       }
 
-      // Vertex AI Gemini 공식 형식으로 멀티모달 컨텐츠 구성
+      // Google AI Studio 공식 형식으로 멀티모달 컨텐츠 구성
       const parts = [];
-      
+
       // 텍스트 프롬프트 추가
       if (referenceImages.length > 0) {
         // 🔧 더욱 강화된 멀티캐릭터 일관성 프롬프트
         const characterCount = referenceImages.length;
         const characterText = characterCount === 1 ? "character" : `${characterCount} characters`;
-        
+
         parts.push({
           text: `${textPrompt}
 
@@ -852,7 +852,7 @@ ${characterCount > 2 ? '- Reference Image 3: Copy this character\'s EXACT appear
 
 ✅ SUCCESS CRITERIA: I should be able to point to each character in the final image and match them perfectly to their reference images.`
         });
-        
+
         // 레퍼런스 이미지들 순서대로 추가
         referenceImages.forEach((refImage, index) => {
           parts.push({
@@ -863,131 +863,72 @@ ${characterCount > 2 ? '- Reference Image 3: Copy this character\'s EXACT appear
           });
           console.log(`📸 Reference Image ${index + 1}: ${refImage.inlineData.mimeType}, ${Math.round(refImage.inlineData.data.length/1024)}KB`);
         });
-        
+
         console.log(`📸 멀티캐릭터 레퍼런스 ${referenceImages.length}개를 균등하게 참조하도록 프롬프트 개선`);
       } else {
         parts.push({ text: textPrompt });
       }
 
-      console.log('📤 Vertex AI 멀티모달 요청 전송 중...', {
+      console.log('📤 Google AI Studio 요청 전송 중...', {
         hasReferenceImages: referenceImages.length > 0,
         referenceCount: referenceImages.length,
         partsCount: parts.length
       });
-      
-      // Vertex AI API 호출 (공식 멀티모달 형식) - 재시도 로직 적용
+
+      // Google AI Studio API 호출 - 재시도 로직 적용
       const response = await this.retryWithBackoff(async () => {
-        return await this.genAI.models.generateContentStream({
-          model: 'gemini-2.5-flash-image-preview',
-          contents: [
-            {
-              role: 'USER',
-              parts: parts
-            }
-          ],
-          config: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
+        return await this.genAI.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: parts
         });
       });
 
-      console.log('✅ Vertex AI SDK 응답 수신 완료');
+      console.log('✅ Google AI Studio API 응답 수신 완료');
 
-      // 스트리밍 응답에서 데이터 수집
+      // 응답에서 데이터 수집
       const generatedFiles = [];
       let totalTokens = 0;
-      let allChunks = [];
-      
-      for await (const chunk of response) {
-        console.log('🔍 Chunk:', {
-          hasText: !!chunk.text,
-          hasData: !!chunk.data, 
-          hasCandidates: !!chunk.candidates,
-          hasUsageMetadata: !!chunk.usageMetadata,
-          hasPromptFeedback: !!chunk.promptFeedback,
-          keys: Object.keys(chunk)
-        });
-        
-        allChunks.push(chunk);
-        
-        // promptFeedback 확인 - 안전 필터링 감지
-        if (chunk.promptFeedback) {
-          console.log('🚨 PromptFeedback 감지:', JSON.stringify(chunk.promptFeedback, null, 2));
-          
-          // 안전 필터링으로 차단된 경우
-          if (chunk.promptFeedback.blockReason) {
-            console.log('🚫 안전 필터링으로 요청 차단됨:', chunk.promptFeedback.blockReason);
-            throw new Error('CONTENT_POLICY_VIOLATION');
+
+      console.log('🔍 Response structure:', {
+        hasResponse: !!response,
+        hasText: !!response.text,
+        hasParts: !!response.parts,
+        hasUsageMetadata: !!response.usageMetadata,
+        keys: Object.keys(response)
+      });
+
+      // usageMetadata에서 토큰 수 가져오기
+      if (response.usageMetadata) {
+        totalTokens = response.usageMetadata.totalTokenCount || 0;
+        console.log('📊 토큰 사용량:', totalTokens);
+      }
+
+      // response.parts에서 이미지 추출
+      if (response.parts) {
+        for (const part of response.parts) {
+          if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+            console.log(`🖼️ 이미지 발견: ${part.inlineData.mimeType}, ${part.inlineData.data.length} chars`);
+            generatedFiles.push({
+              data: part.inlineData.data,
+              mimeType: part.inlineData.mimeType
+            });
           }
-          
-          // 안전 등급이 문제가 있는 경우
-          if (chunk.promptFeedback.safetyRatings) {
-            for (const rating of chunk.promptFeedback.safetyRatings) {
-              if (rating.probability === 'HIGH' || rating.probability === 'MEDIUM') {
-                console.log('🚫 안전성 검사 실패:', rating.category, rating.probability);
-                throw new Error('CONTENT_POLICY_VIOLATION');
-              }
-            }
-          }
-        }
-        
-        // 텍스트 처리
-        if (chunk.text) {
-          console.log('📝 텍스트:', chunk.text.substring(0, 50));
-        }
-        
-        // candidates에서 이미지 처리 (chunk.data는 중복이므로 제거)
-        if (chunk.candidates) {
-          for (const candidate of chunk.candidates) {
-            if (candidate.content?.parts) {
-              for (const part of candidate.content.parts) {
-                if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
-                  console.log(`🖼️ 이미지 발견: ${part.inlineData.mimeType}, ${part.inlineData.data.length} chars`);
-                  generatedFiles.push({
-                    data: part.inlineData.data,
-                    mimeType: part.inlineData.mimeType
-                  });
-                }
-              }
-            }
-          }
-        }
-        
-        // 토큰 사용량
-        if (chunk.usageMetadata) {
-          totalTokens = chunk.usageMetadata.totalTokenCount || 0;
         }
       }
 
-      console.log('📊 스트림 완료:', {
-        totalChunks: allChunks.length,
-        generatedFiles: generatedFiles.length,
-        totalTokens
-      });
-
       if (generatedFiles.length === 0) {
         console.error('❌ 이미지가 생성되지 않았습니다');
-        console.error('전체 청크:', allChunks.map((c, i) => ({
-          index: i,
-          keys: Object.keys(c),
-          hasText: !!c.text,
-          hasData: !!c.data,
-          hasCandidates: !!c.candidates
-        })));
-        
-        // 텍스트만 반환된 경우 (Google AI 동시 요청 제한) - 재시도 가능한 오류로 표시
-        const hasTextOnly = allChunks.some(c => c.text && !c.data);
-        if (hasTextOnly) {
-          console.warn('⚠️ Google AI가 텍스트만 반환했습니다 (동시 요청 제한) - 재시도 필요');
-          throw new Error('Google AI 동시 요청 제한 - 재시도 필요');
-        }
-        
+        console.error('전체 응답:', {
+          text: response.text,
+          parts: response.parts,
+          hasInlineData: response.parts?.some((p: any) => p.inlineData)
+        });
         throw new Error('이미지가 생성되지 않았습니다');
       }
 
       console.log(`✅ 멀티모달 이미지 생성 성공: ${generatedFiles.length}개 이미지, ${totalTokens} 토큰 사용`);
 
-      // 호환성을 위해 Gemini API 형식으로 반환
+      // 호환성을 위해 기존 형식으로 반환
       return {
         response: {
           candidates: [{
@@ -1008,10 +949,10 @@ ${characterCount > 2 ? '- Reference Image 3: Copy this character\'s EXACT appear
           }
         }
       };
-      
+
     } catch (error) {
-      console.error('❌ Vertex AI SDK 오류:', error);
-      throw new Error(`Vertex AI SDK 호출 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      console.error('❌ Google AI Studio API 오류:', error);
+      throw new Error(`Google AI Studio API 호출 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
   }
 

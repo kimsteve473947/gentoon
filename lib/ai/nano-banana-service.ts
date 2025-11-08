@@ -27,20 +27,22 @@ export class NanoBananaService {
     // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
     const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.trim();
     const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.trim();
-    
+
     if (!projectId) {
       throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
     }
 
-    // 서비스 계정 credentials 구성
-    let credentials = null;
-    
-    // 1. 환경변수로 개별 값 사용 (Vercel 권장 방식)
+    // @google/genai는 Application Default Credentials (ADC)를 사용
+    // 프로덕션에서는 환경변수를 통해 google-auth-library가 자동으로 credentials를 로드함
+
+    // 1. Vercel/프로덕션: 환경변수로 credentials 설정
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       try {
+        console.log('🔑 Vercel 환경: Service Account credentials 설정 시작');
+
         const rawPrivateKey = process.env.GOOGLE_PRIVATE_KEY;
-        console.log('🔍 GOOGLE_PRIVATE_KEY 원본 길이:', rawPrivateKey.length);
-        console.log('🔍 GOOGLE_PRIVATE_KEY 시작 부분:', rawPrivateKey.substring(0, 50));
+        console.log('🔍 GOOGLE_PRIVATE_KEY 길이:', rawPrivateKey.length);
+        console.log('🔍 GOOGLE_PRIVATE_KEY 시작:', rawPrivateKey.substring(0, 50));
 
         // private_key 처리: \n 문자열을 실제 개행문자로 변환
         let processedPrivateKey = rawPrivateKey;
@@ -51,9 +53,11 @@ export class NanoBananaService {
           console.log('ℹ️ 이미 실제 개행문자 포함됨 (변환 불필요)');
         }
 
-        credentials = {
+        // GOOGLE_APPLICATION_CREDENTIALS_JSON 환경변수 동적 생성
+        // google-auth-library가 이 값을 읽어서 자동으로 인증
+        const credentials = {
           type: "service_account",
-          project_id: process.env.GOOGLE_CLOUD_PROJECT_ID || projectId,
+          project_id: projectId,
           private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
           private_key: processedPrivateKey,
           client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -61,70 +65,42 @@ export class NanoBananaService {
           auth_uri: "https://accounts.google.com/o/oauth2/auth",
           token_uri: "https://oauth2.googleapis.com/token",
           auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL
+          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
+          universe_domain: "googleapis.com"
         };
 
-        console.log('✅ 환경변수에서 Vertex AI credentials 구성 성공');
-        console.log('📧 Service Account Email:', credentials.client_email);
-        console.log('🔑 Private Key starts with:', credentials.private_key?.substring(0, 27)); // "-----BEGIN PRIVATE KEY-----"
+        // google-auth-library가 사용할 수 있도록 환경변수에 설정
+        process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON = JSON.stringify(credentials);
+
+        console.log('✅ Credentials JSON 환경변수 설정 완료');
+        console.log('📧 Service Account:', credentials.client_email);
+        console.log('🔑 Private Key 시작:', credentials.private_key.substring(0, 27)); // "-----BEGIN PRIVATE KEY-----"
       } catch (error) {
-        console.error('❌ 환경변수 credentials 구성 실패:', error);
-        throw error; // 에러를 다시 던져서 상위에서 처리하도록
+        console.error('❌ Credentials 설정 실패:', error);
+        throw error;
       }
     }
-    
-    // 2. 로컬 환경에서 파일 직접 읽기 (개발용)
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      try {
-        const fs = require('fs');
-        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        console.log('🔑 로컬 credentials 파일 로드 시도:', credentialsPath);
-        
-        if (fs.existsSync(credentialsPath)) {
-          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
-          credentials = JSON.parse(credentialsContent);
-          console.log('✅ 로컬 파일에서 Vertex AI credentials 로드 성공');
-        } else {
-          console.error('❌ Credentials 파일 없음:', credentialsPath);
-        }
-      } catch (error) {
-        console.error('❌ Credentials 파일 읽기 실패:', error);
-      }
+
+    // 2. 로컬 환경: 파일 경로 사용
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('🔑 로컬 환경: credentials 파일 경로 사용');
+      console.log('📁 파일 경로:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
     }
-    
-    // 3. Vercel JSON 환경변수 사용 (백업 방식)
-    if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-      try {
-        const cleanJsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
-        credentials = JSON.parse(cleanJsonString);
-        
-        if (credentials.private_key) {
-          credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-        }
-        
-        console.log('✅ JSON 환경변수에서 credentials 로드 성공');
-      } catch (error) {
-        console.error('❌ JSON credentials 파싱 실패:', error);
-      }
-    }
-    
-    if (!credentials) {
-      throw new Error("Vertex AI credentials를 찾을 수 없습니다");
-    }
-    
-    // Vertex AI 방식으로 초기화
+
+    // Vertex AI 초기화 (간소화된 방식)
+    // @google/genai는 자동으로 GOOGLE_APPLICATION_CREDENTIALS_JSON을 읽음
     this.genAI = new GoogleGenAI({
+      vertexai: true,  // ✅ Vertex AI 명시적 사용
       project: projectId,
-      location: location,
-      credentials: credentials
+      location: location
     });
-    
+
     this.webpOptimizer = new WebPOptimizer();
-    
+
     console.log('✅ Vertex AI 초기화 완료:', {
       project: projectId,
       location: location,
-      hasCredentials: !!credentials
+      vertexai: true
     });
   }
 

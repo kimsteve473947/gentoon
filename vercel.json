@@ -1,28 +1,4 @@
 {
-  "buildCommand": "prisma generate && node scripts/patch-build.js && node --require ./lib/polyfills/self-polyfill.js ./node_modules/.bin/next build",
-  "installCommand": "npm install --legacy-peer-deps",
-  "env": {
-    "SKIP_BUILD_STATIC_GENERATION": "1"
-  },
-  "functions": {
-    "app/api/cron/billing/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/recurring-payments/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/process-pending-downgrades/route.ts": {
-      "maxDuration": 300
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/billing",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/process-pending-downgrades",
-      "schedule": "0 1 * * *"
-    }
-  ]
+  "buildCommand": "prisma generate --no-engine && npm run build",
+  "installCommand": "npm install && prisma generate"
 }

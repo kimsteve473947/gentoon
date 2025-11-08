@@ -203,29 +203,6 @@ export function Header() {
   const hideHeader = ['/sign-in', '/sign-up', '/studio'].includes(pathname)
   if (hideHeader) return null
 
-  // 클라이언트에서만 렌더링
-  if (!mounted) {
-    return (
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <img 
-                src="/gentoon.webp" 
-                alt="GenToon" 
-                className="h-10 w-10 object-contain"
-              />
-              <span className="text-2xl font-bold">GenToon</span>
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
-          </div>
-        </div>
-      </header>
-    )
-  }
-
   return (
     <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">

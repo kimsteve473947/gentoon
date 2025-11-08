@@ -13,9 +13,9 @@ const GEMINI_COST = {
 } as const;
 
 /**
- * Nano Banana (Vertex AI) Service - 실제 이미지 생성
- * 
- * Vertex AI Gemini 2.5 Flash Image Preview 모델을 사용한 웹툰 이미지 생성
+ * Nano Banana (Google AI Studio) Service - 실제 이미지 생성
+ *
+ * Google AI Studio Gemini 2.5 Flash Image Preview 모델을 사용한 웹툰 이미지 생성
  * 캐릭터 레퍼런스 이미지 지원으로 일관성 있는 캐릭터 생성
  */
 export class NanoBananaService {
@@ -24,55 +24,21 @@ export class NanoBananaService {
   private model: string = 'gemini-2.5-flash-image-preview';
   
   constructor() {
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID?.trim();
-    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global').trim();
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
 
-    if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT_ID is required");
+    if (!apiKey) {
+      throw new Error("GOOGLE_AI_API_KEY is required");
     }
 
-    // Vercel 환경: 환경변수로 credentials 객체 생성
-    const hasServiceAccountEnv = !!(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_PRIVATE_KEY
-    );
+    console.log('🔑 Google AI Studio API Key 방식 사용');
 
-    let genAIConfig: any = {
-      vertexai: true,
-      project: projectId,
-      location: location
-    };
+    // Google AI Studio API Key 방식 - 단순하고 명확
+    this.genAI = new GoogleGenAI({
+      apiKey: apiKey
+    });
 
-    if (hasServiceAccountEnv) {
-      // Vercel: credentials를 직접 전달
-      const privateKey = process.env.GOOGLE_PRIVATE_KEY!.includes('\\n')
-        ? process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n')
-        : process.env.GOOGLE_PRIVATE_KEY!;
-
-      genAIConfig.googleAuthOptions = {
-        credentials: {
-          type: "service_account",
-          project_id: projectId,
-          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-          private_key: privateKey,
-          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          auth_uri: "https://accounts.google.com/o/oauth2/auth",
-          token_uri: "https://oauth2.googleapis.com/token",
-          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
-          universe_domain: "googleapis.com"
-        }
-      };
-      console.log('🔑 Vercel 환경: Service Account credentials 설정');
-    } else {
-      // 로컬: GOOGLE_APPLICATION_CREDENTIALS 환경변수 사용
-      console.log('🔑 로컬 환경: GOOGLE_APPLICATION_CREDENTIALS 사용');
-    }
-
-    this.genAI = new GoogleGenAI(genAIConfig);
     this.webpOptimizer = new WebPOptimizer();
-    console.log('✅ Vertex AI 초기화 완료');
+    console.log('✅ Google AI Studio 초기화 완료');
   }
 
   /**

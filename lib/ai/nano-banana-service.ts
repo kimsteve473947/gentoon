@@ -24,86 +24,24 @@ export class NanoBananaService {
   private model: string = 'gemini-2.5-flash-image-preview';
   
   constructor() {
-    // Vertex AI 프로젝트 설정 (Vercel 환경변수 개행문자 제거)
-    const projectId = (process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT)?.replace(/[\r\n]/g, '').trim();
-    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global')?.replace(/[\r\n]/g, '').trim();
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID?.trim();
+    const location = (process.env.GOOGLE_CLOUD_LOCATION || 'global').trim();
 
     if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT_ID is required for Vertex AI");
+      throw new Error("GOOGLE_CLOUD_PROJECT_ID is required");
     }
 
-    // @google/genai는 googleAuthOptions를 통해 credentials를 직접 전달받음
+    console.log('🔧 Vertex AI 초기화:', { projectId, location });
 
-    // 1. Vercel/프로덕션: 환경변수로 credentials 객체 생성
-    let credentials: any = undefined;
-
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-      try {
-        console.log('🔑 Vercel 환경: Service Account credentials 설정 시작');
-
-        const rawPrivateKey = process.env.GOOGLE_PRIVATE_KEY;
-        console.log('🔍 GOOGLE_PRIVATE_KEY 길이:', rawPrivateKey.length);
-        console.log('🔍 GOOGLE_PRIVATE_KEY 시작:', rawPrivateKey.substring(0, 50));
-
-        // private_key 처리: \n 문자열을 실제 개행문자로 변환
-        let processedPrivateKey = rawPrivateKey;
-        if (rawPrivateKey.includes('\\n')) {
-          processedPrivateKey = rawPrivateKey.replace(/\\n/g, '\n');
-          console.log('✅ \\n을 실제 개행문자로 변환 완료');
-        } else {
-          console.log('ℹ️ 이미 실제 개행문자 포함됨 (변환 불필요)');
-        }
-
-        // Credentials 객체 생성 - GoogleGenAI constructor에 직접 전달
-        credentials = {
-          type: "service_account",
-          project_id: projectId,
-          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-          private_key: processedPrivateKey,
-          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          auth_uri: "https://accounts.google.com/o/oauth2/auth",
-          token_uri: "https://oauth2.googleapis.com/token",
-          auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
-          universe_domain: "googleapis.com"
-        };
-
-        console.log('✅ Credentials 객체 생성 완료');
-        console.log('📧 Service Account:', credentials.client_email);
-        console.log('🔑 Private Key 시작:', credentials.private_key.substring(0, 27)); // "-----BEGIN PRIVATE KEY-----"
-      } catch (error) {
-        console.error('❌ Credentials 설정 실패:', error);
-        throw error;
-      }
-    }
-
-    // 2. 로컬 환경: 파일 경로 사용
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('🔑 로컬 환경: credentials 파일 경로 사용');
-      console.log('📁 파일 경로:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    }
-
-    // Vertex AI 초기화 - credentials를 googleAuthOptions로 직접 전달
-    // ✅ CRITICAL FIX: Pass credentials via googleAuthOptions, not environment variables
+    // GoogleGenAI 초기화 - 로컬/프로덕션 모두 동일하게 처리
     this.genAI = new GoogleGenAI({
-      vertexai: true,  // ✅ Vertex AI 명시적 사용
+      vertexai: true,
       project: projectId,
-      location: location,
-      ...(credentials && {
-        googleAuthOptions: {
-          credentials: credentials
-        }
-      })
+      location: location
     });
 
     this.webpOptimizer = new WebPOptimizer();
-
-    console.log('✅ Vertex AI 초기화 완료:', {
-      project: projectId,
-      location: location,
-      vertexai: true
-    });
+    console.log('✅ Vertex AI 초기화 완료');
   }
 
   /**

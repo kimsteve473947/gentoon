@@ -246,9 +246,11 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
   } catch (error) {
     console.error("🚨 Generation API error:", error);
+    console.error("🚨 Error type:", error?.constructor?.name);
     console.error("🚨 Error message:", error instanceof Error ? error.message : "Unknown error");
     console.error("🚨 Error stack:", error instanceof Error ? error.stack : "No stack");
-    
+    console.error("🚨 Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+
     // 🚀 활동 로깅 - 이미지 생성 실패
     try {
       const userId = request.user.id; // userId를 다시 가져와서 사용
@@ -257,7 +259,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } catch (logError) {
       console.error("Activity logging failed:", logError);
     }
-    
+
     // 사용자 친화적 에러 메시지 처리
     const errorMessage = error instanceof Error ? error.message : "이미지 생성 중 오류가 발생했습니다";
     

@@ -264,11 +264,9 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          {(() => {
-            console.log('🔍 [Header Render] loading:', loading, 'user:', user, 'userRole:', userRole)
-            return loading ? (
-              <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
-            ) : user ? (
+          {loading ? (
+            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-muted px-2 py-1 rounded-md outline-none">
                   <Avatar className="h-8 w-8">
@@ -337,8 +335,7 @@ export function Header() {
                 </Link>
               </Button>
             </div>
-          )
-          })()}
+          )}
         </div>
       </div>
     </header>

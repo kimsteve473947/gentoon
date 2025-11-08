@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ErrorCode, getErrorDetails, inferErrorCode } from '@/lib/errors/error-types';
+import { ensureUserExists } from '@/lib/supabase/auto-onboarding';
 
 export interface AuthenticatedRequest extends NextRequest {
   user: {
@@ -50,16 +51,37 @@ export function withAuth<T = any>(
         );
       }
 
-      // 사용자 데이터 조회
-      const { data: userData, error: userError } = await supabase
+      // 사용자 데이터 조회 (없으면 자동 생성)
+      let { data: userData, error: userError } = await supabase
         .from('user')
         .select('id, email, name, avatarUrl, role')
         .eq('id', user.id)
         .single();
 
+      // 사용자가 없으면 자동 온보딩
       if (!userData || userError) {
-        console.error('User data error:', userError);
-        return ApiResponse.errorWithCode(ErrorCode.USER_NOT_FOUND, undefined, userError?.message);
+        console.log('🚀 신규 사용자 자동 온보딩 시작:', user.email);
+        const onboardingResult = await ensureUserExists(user);
+
+        if (!onboardingResult.success) {
+          console.error('Auto-onboarding failed:', onboardingResult.error);
+          return ApiResponse.errorWithCode(ErrorCode.USER_NOT_FOUND, "사용자 생성에 실패했습니다", onboardingResult.error);
+        }
+
+        // 다시 사용자 데이터 조회
+        const { data: newUserData, error: retryError } = await supabase
+          .from('user')
+          .select('id, email, name, avatarUrl, role')
+          .eq('id', user.id)
+          .single();
+
+        if (!newUserData || retryError) {
+          console.error('Failed to fetch user after onboarding:', retryError);
+          return ApiResponse.errorWithCode(ErrorCode.USER_NOT_FOUND, undefined, retryError?.message);
+        }
+
+        userData = newUserData;
+        console.log('✅ 신규 사용자 자동 온보딩 완료');
       }
 
       // 인증된 요청 객체 생성

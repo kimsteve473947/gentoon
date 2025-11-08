@@ -26,6 +26,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
@@ -43,9 +44,19 @@ export function Header() {
     const getUser = async () => {
       try {
         // 실제 사용자 인증 확인
-
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
+
+        // 사용자 role 조회
+        if (user) {
+          const { data: userData } = await supabase
+            .from('user')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+          setUserRole(userData?.role || null)
+        }
       } catch (error) {
         console.error('Error fetching user:', error)
       } finally {
@@ -56,8 +67,21 @@ export function Header() {
     getUser()
 
     // 인증 상태 변경 리스너
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+
+      // role도 다시 조회
+      if (session?.user) {
+        const { data: userData } = await supabase
+          .from('user')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        setUserRole(userData?.role || null)
+      } else {
+        setUserRole(null)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -145,10 +169,9 @@ export function Header() {
     return null
   }
 
-  // 관리자 권한 확인
+  // 관리자 권한 확인 (role 기반)
   const isAdmin = () => {
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
-    return user?.email === adminEmail
+    return userRole === 'ADMIN'
   }
 
   // 특정 페이지에서는 헤더를 숨김

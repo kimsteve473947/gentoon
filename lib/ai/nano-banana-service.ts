@@ -38,11 +38,24 @@ export class NanoBananaService {
     // 1. 환경변수로 개별 값 사용 (Vercel 권장 방식)
     if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
       try {
+        const rawPrivateKey = process.env.GOOGLE_PRIVATE_KEY;
+        console.log('🔍 GOOGLE_PRIVATE_KEY 원본 길이:', rawPrivateKey.length);
+        console.log('🔍 GOOGLE_PRIVATE_KEY 시작 부분:', rawPrivateKey.substring(0, 50));
+
+        // private_key 처리: \n 문자열을 실제 개행문자로 변환
+        let processedPrivateKey = rawPrivateKey;
+        if (rawPrivateKey.includes('\\n')) {
+          processedPrivateKey = rawPrivateKey.replace(/\\n/g, '\n');
+          console.log('✅ \\n을 실제 개행문자로 변환 완료');
+        } else {
+          console.log('ℹ️ 이미 실제 개행문자 포함됨 (변환 불필요)');
+        }
+
         credentials = {
           type: "service_account",
           project_id: process.env.GOOGLE_CLOUD_PROJECT_ID || projectId,
           private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          private_key: processedPrivateKey,
           client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
           client_id: process.env.GOOGLE_CLIENT_ID,
           auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -50,9 +63,13 @@ export class NanoBananaService {
           auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
           client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL
         };
+
         console.log('✅ 환경변수에서 Vertex AI credentials 구성 성공');
+        console.log('📧 Service Account Email:', credentials.client_email);
+        console.log('🔑 Private Key starts with:', credentials.private_key?.substring(0, 27)); // "-----BEGIN PRIVATE KEY-----"
       } catch (error) {
         console.error('❌ 환경변수 credentials 구성 실패:', error);
+        throw error; // 에러를 다시 던져서 상위에서 처리하도록
       }
     }
     

@@ -597,8 +597,11 @@ export class TokenManager {
     userPlan: string;
   }> {
     try {
+      console.log('🔍 [getImageGenerationBalance] 시작:', { userId, NODE_ENV: process.env.NODE_ENV });
+
       // 개발 모드에서는 기본값 반환
       if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [getImageGenerationBalance] 개발 모드 - 무제한 반환');
         return {
           remainingTokens: 1000000, // 100만 토큰
           usedThisMonth: 0,
@@ -607,14 +610,23 @@ export class TokenManager {
         };
       }
 
+      console.log('🔍 [getImageGenerationBalance] Prisma 조회 시작...');
+
       // 사용자 구독 정보 조회
       const subscription = await prisma.subscription.findUnique({
         where: { userId },
-        select: { 
+        select: {
           plan: true,
           imageTokensTotal: true,
           imageTokensUsed: true
         }
+      });
+
+      console.log('📊 [getImageGenerationBalance] 구독 정보:', {
+        found: !!subscription,
+        plan: subscription?.plan,
+        imageTokensTotal: subscription?.imageTokensTotal,
+        imageTokensUsed: subscription?.imageTokensUsed
       });
 
       const userPlan = subscription?.plan || 'FREE';
@@ -623,14 +635,18 @@ export class TokenManager {
       const usedThisMonth = subscription?.imageTokensUsed || 0;
       const remainingTokens = monthlyLimit - usedThisMonth;
 
-      return {
+      const result = {
         remainingTokens: Math.max(0, remainingTokens),
         usedThisMonth,
         monthlyLimit,
         userPlan,
       };
 
+      console.log('✅ [getImageGenerationBalance] 결과:', result);
+      return result;
+
     } catch (error) {
+      console.error("❌ [getImageGenerationBalance] 에러 발생:", error);
       secureError("이미지 토큰 잔액 조회 오류", error);
       return {
         remainingTokens: 0,

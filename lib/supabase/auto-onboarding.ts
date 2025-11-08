@@ -75,12 +75,20 @@ export async function ensureUserExists(authUser: any): Promise<{
     const userId = newUser.id;
     devLog('사용자 생성 완료');
 
-    // 4. 구독 정보 생성
+    // 4. 구독 정보 생성 (새로운 분리된 토큰 시스템 사용)
     const { error: subscriptionError } = await supabase
       .from('subscription')
       .insert({
         userId: userId,
         plan: plan,
+        // 🔄 새로운 분리된 토큰 시스템
+        imageTokensTotal: config.imageTokens,
+        imageTokensUsed: 0,
+        textTokensTotal: config.textTokens || 0,
+        textTokensUsed: 0,
+        scriptGenerationsTotal: config.scriptGenerations,
+        scriptGenerationsUsed: 0,
+        // 🚨 하위 호환성을 위한 레거시 필드 (deprecated)
         tokensTotal: config.platformTokens,
         tokensUsed: 0,
         maxCharacters: config.maxCharacters,

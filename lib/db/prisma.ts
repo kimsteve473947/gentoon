@@ -4,9 +4,11 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// Supabase 연결 설정 (MCP와 동일한 직접 연결 방식)
-const databaseUrl = process.env.DATABASE_URL || 
-  "postgresql://postgres.lzxkvtwuatsrczhctsxb:@rlawndgnl0206@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true";
+// ⚡ DIRECT_URL 우선 사용 (RLS 우회를 위한 service role 권한)
+// Fallback: DATABASE_URL (로컬 개발용)
+const databaseUrl = process.env.DIRECT_URL ||
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:@rlawndgnl0206@lzxkvtwuatsrczhctsxb.supabase.co:5432/postgres";
 
 console.log('🔗 Prisma DATABASE_URL:', databaseUrl.substring(0, 50) + '...');
 

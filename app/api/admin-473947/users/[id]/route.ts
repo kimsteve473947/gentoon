@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { tossRefundAPI } from '@/lib/payments/toss-refund';
 import { cashReceiptAutomationService } from '@/lib/payments/cash-receipt-automation';
 
@@ -414,6 +415,10 @@ export async function PATCH(
       }, { status: 403 });
     }
 
+    // 관리자 확인 후 Service Role 클라이언트로 전환 (RLS 우회)
+    const adminSupabase = createServiceClient();
+    console.log('🔑 Service Role 클라이언트로 전환 (RLS 우회)');
+
     const body = await request.json();
     console.log('📦 요청 데이터:', body);
     
@@ -438,8 +443,8 @@ export async function PATCH(
     if (Object.keys(userUpdates).length > 0) {
       userUpdates.updatedAt = new Date().toISOString();
       console.log('👤 사용자 테이블 업데이트:', userUpdates);
-      
-      const { error: userUpdateError } = await supabase
+
+      const { error: userUpdateError } = await adminSupabase
         .from('user')
         .update(userUpdates)
         .eq('id', userId);
@@ -466,7 +471,7 @@ export async function PATCH(
       console.log('📋 구독 테이블 업데이트:', subscriptionUpdates);
       
       // 먼저 구독이 존재하는지 확인
-      const { data: existingSubscription, error: checkError } = await supabase
+      const { data: existingSubscription, error: checkError } = await adminSupabase
         .from('subscription')
         .select('id')
         .eq('userId', userId)
@@ -475,7 +480,7 @@ export async function PATCH(
       if (checkError && checkError.code === 'PGRST116') {
         // 구독이 없으면 생성
         console.log('📋 구독이 없음, 새로 생성');
-        const { error: insertError } = await supabase
+        const { error: insertError } = await adminSupabase
           .from('subscription')
           .insert({
             userId,
@@ -493,7 +498,7 @@ export async function PATCH(
         throw checkError;
       } else {
         // 구독이 있으면 업데이트
-        const { error: subscriptionUpdateError } = await supabase
+        const { error: subscriptionUpdateError } = await adminSupabase
           .from('subscription')
           .update(subscriptionUpdates)
           .eq('userId', userId);
@@ -508,7 +513,7 @@ export async function PATCH(
 
     // 스토리지 제한 업데이트
     if (storageLimit !== undefined) {
-      await supabase
+      await adminSupabase
         .from('user_storage')
         .upsert({
           userId,
@@ -517,7 +522,7 @@ export async function PATCH(
         });
 
       // user_usage_cache도 업데이트
-      await supabase
+      await adminSupabase
         .from('user_usage_cache')
         .upsert({
           user_id: userId,
@@ -527,7 +532,7 @@ export async function PATCH(
     }
 
     // 수정된 사용자 정보 재조회 (분리해서 조회)
-    const { data: updatedUser, error: fetchError } = await supabase
+    const { data: updatedUser, error: fetchError } = await adminSupabase
       .from('user')
       .select('*')
       .eq('id', userId)
@@ -539,7 +544,7 @@ export async function PATCH(
     }
 
     // 구독 정보 별도 조회
-    const { data: updatedSubscription, error: subscriptionFetchError } = await supabase
+    const { data: updatedSubscription, error: subscriptionFetchError } = await adminSupabase
       .from('subscription')
       .select('*')
       .eq('userId', userId)
@@ -563,7 +568,7 @@ export async function PATCH(
     };
 
     // 활동 로그 추가
-    await supabase
+    await adminSupabase
       .from('user_activities')
       .insert({
         user_id: userId,

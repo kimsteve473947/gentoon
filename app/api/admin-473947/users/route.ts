@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // GET: 완전한 사용자 목록 조회 (검색, 필터링, 정렬, 페이지네이션, 실제 통계)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
+
     // 1. 인증 및 관리자 권한 확인
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -20,13 +21,16 @@ export async function GET(request: NextRequest) {
       .select('plan')
       .eq('userId', user.id)
       .single();
-    
+
     if (subscription?.plan !== 'ADMIN') {
       return NextResponse.json({
         success: false,
         error: '관리자 권한이 필요합니다'
       }, { status: 403 });
     }
+
+    // 2. 관리자 확인 후 Service Role 클라이언트로 전환 (RLS 우회)
+    const adminSupabase = createServiceClient();
 
     // 2. 쿼리 파라미터 추출
     const { searchParams } = new URL(request.url);
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // 3. 기본 사용자 목록 조회 (외래 키 관계가 없으므로 별도 조회)
-    let userQuery = supabase
+    let userQuery = adminSupabase
       .from('user')
       .select('*', { count: 'exact' });
 
@@ -79,31 +83,31 @@ export async function GET(request: NextRequest) {
       { data: latestTransactions }
     ] = await Promise.all([
       // 구독 정보 조회
-      supabase
+      adminSupabase
         .from('subscription')
         .select('*')
         .in('userId', userIds),
-      
+
       // 캐시된 통계 정보 조회 (스토리지 사용량 제외)
-      supabase
+      adminSupabase
         .from('user_usage_cache')
         .select('user_id, total_projects, total_characters, current_month_images')
         .in('user_id', userIds),
-      
+
       // 최근 활동 조회 (사용자별 최신 1건만)
-      supabase
+      adminSupabase
         .from('user_activities')
         .select('user_id, created_at')
         .in('user_id', userIds)
         .order('created_at', { ascending: false }),
-      
+
       // 최근 거래 정보 조회 (사용자별 최신 결제만)
-      supabase
+      adminSupabase
         .rpc('get_latest_transactions', { user_ids: userIds })
         .then(({ data }) => ({ data }))
-        .catch(() => 
+        .catch(() =>
           // RPC 함수가 없으면 기본 쿼리 사용
-          supabase
+          adminSupabase
             .from('transaction')
             .select('userId, id, amount, createdAt, tossPaymentKey, status')
             .in('userId', userIds)

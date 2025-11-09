@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { generateOptimizedPrompt, getRecommendedDimensions, type AspectRatio } from './prompt-templates';
 import { WebPOptimizer } from '@/lib/image/webp-optimizer';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -15,14 +14,17 @@ const GEMINI_COST = {
 /**
  * Nano Banana (Google AI Studio) Service - 실제 이미지 생성
  *
- * Google AI Studio Gemini 2.5 Flash Image Preview 모델을 사용한 웹툰 이미지 생성
+ * Google AI Studio Gemini 2.5 Flash Image 모델을 사용한 웹툰 이미지 생성
  * 캐릭터 레퍼런스 이미지 지원으로 일관성 있는 캐릭터 생성
+ *
+ * ✅ REST API 직접 호출 방식 (SDK 사용 안함)
  */
 export class NanoBananaService {
   private webpOptimizer: WebPOptimizer;
-  private genAI: GoogleGenAI;
-  private model: string = 'gemini-2.5-flash-image-preview';
-  
+  private apiKey: string;
+  private apiEndpoint: string = 'https://generativelanguage.googleapis.com/v1beta/models';
+  private model: string = 'gemini-2.5-flash-image';
+
   constructor() {
     const apiKey = process.env.GOOGLE_AI_API_KEY;
 
@@ -30,15 +32,14 @@ export class NanoBananaService {
       throw new Error("GOOGLE_AI_API_KEY is required");
     }
 
-    console.log('🔑 Google AI Studio API Key 방식 사용');
+    console.log('🔑 Google AI Studio REST API 직접 호출 방식 사용');
 
-    // Google AI Studio API Key 방식 - 단순하고 명확
-    this.genAI = new GoogleGenAI({
-      apiKey: apiKey
-    });
-
+    this.apiKey = apiKey;
     this.webpOptimizer = new WebPOptimizer();
-    console.log('✅ Google AI Studio 초기화 완료');
+
+    console.log(`✅ Google AI Studio 초기화 완료`);
+    console.log(`🌐 엔드포인트: ${this.apiEndpoint}`);
+    console.log(`🤖 모델: ${this.model}`);
   }
 
   /**
@@ -64,7 +65,7 @@ export class NanoBananaService {
 
         // 백오프 지연
         const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
-        console.warn(`🔄 Vertex AI 429 에러 재시도 ${attempt + 1}/${maxRetries} (${Math.round(delay)}ms 대기)`);
+        console.warn(`🔄 Google AI Studio 429 에러 재시도 ${attempt + 1}/${maxRetries} (${Math.round(delay)}ms 대기)`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -251,31 +252,31 @@ export class NanoBananaService {
         console.warn('⚠️  모든 레퍼런스 이미지 로드 실패 - 텍스트 프롬프트만으로 생성 진행');
       }
       
-      console.log(`🚀 Vertex AI SDK 호출 시작 (컨텐츠 ${contents.length}개, 레퍼런스 이미지 ${successfulReferenceImages}개)`);
+      console.log(`🚀 Google AI Studio 호출 시작 (컨텐츠 ${contents.length}개, 레퍼런스 이미지 ${successfulReferenceImages}개)`);
       console.log(`📋 최종 프롬프트 미리보기: ${finalPrompt.substring(0, 500)}...`);
       
-      // Vertex AI SDK 호출
-      console.log('🌟 Vertex AI SDK 요청 상세:', {
+      // Google AI Studio 호출
+      console.log('🌟 Google AI Studio 요청 상세:', {
         model: 'gemini-2.5-flash-image-preview',
         contentCount: contents.length,
         hasReference: contents.some(c => c.inlineData),
         aspectRatio
       });
       
-      // Vertex AI SDK 호출 (정식 API 방식)
+      // Google AI Studio 호출 (정식 API 방식)
       const result = await this.callGoogleAI(contents);
-      console.log('📋 Raw Vertex AI Result:', {
+      console.log('📋 Raw Google AI Studio Result:', {
         hasResponse: !!result.response,
         candidateCount: result.response?.candidates?.length || 0
       });
       
       const response = result.response;
       
-      // 실제 토큰 사용량 추출 (Vertex AI SDK 응답에서)
+      // 실제 토큰 사용량 추출 (Google AI Studio 응답에서)
       let actualTokensUsed = 0;
       if (response.usageMetadata) {
         actualTokensUsed = response.usageMetadata.totalTokenCount || 0;
-        console.log('🔢 Vertex AI SDK 실제 토큰 사용량:', {
+        console.log('🔢 Google AI Studio 실제 토큰 사용량:', {
           promptTokens: response.usageMetadata.promptTokenCount,
           candidatesTokens: response.usageMetadata.candidatesTokenCount,
           totalTokens: response.usageMetadata.totalTokenCount,
@@ -284,16 +285,16 @@ export class NanoBananaService {
       } else {
         // 토큰 정보가 없는 경우 추정치 사용 (보수적으로 높게 설정)
         actualTokensUsed = GEMINI_COST.TOKENS_PER_IMAGE * 1.2; // 20% 여유분
-        console.warn('⚠️ Vertex AI SDK에서 토큰 사용량을 가져올 수 없어 추정치 사용:', actualTokensUsed);
+        console.warn('⚠️ Google AI Studio에서 토큰 사용량을 가져올 수 없어 추정치 사용:', actualTokensUsed);
       }
       
       // 응답 구조 디버깅
-      console.log('🔍 Vertex AI SDK 응답 구조:', JSON.stringify(response, null, 2));
+      console.log('🔍 Google AI Studio 응답 구조:', JSON.stringify(response, null, 2));
       
       // 생성 성공/실패 명확히 로깅
       const candidates = response.candidates;
       if (!candidates || candidates.length === 0) {
-        console.log('❌ Vertex AI SDK 이미지 생성 실패: 후보가 없습니다');
+        console.log('❌ Google AI Studio 이미지 생성 실패: 후보가 없습니다');
         throw new Error('이미지 생성 결과가 없습니다');
       }
       
@@ -301,7 +302,7 @@ export class NanoBananaService {
       console.log('📋 첫 번째 후보 구조:', JSON.stringify(candidate, null, 2));
       
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        console.log(`⚠️ Vertex AI SDK 생성 중단됨: ${candidate.finishReason}`);
+        console.log(`⚠️ Google AI Studio 생성 중단됨: ${candidate.finishReason}`);
         if (candidate.finishReason === 'PROHIBITED_CONTENT' || candidate.finishReason === 'SAFETY') {
           console.log('🚫 콘텐츠 정책 위반으로 이미지 생성이 거부되었습니다');
           throw new Error('CONTENT_POLICY_VIOLATION');
@@ -314,7 +315,7 @@ export class NanoBananaService {
       }
       
       // 이미지 생성 성공
-      console.log('✅ Vertex AI SDK 이미지 생성 성공!');
+      console.log('✅ Google AI Studio 이미지 생성 성공!');
       
       if (!candidate.content || !candidate.content.parts) {
         throw new Error('이미지 데이터가 없습니다');
@@ -363,9 +364,9 @@ export class NanoBananaService {
         throw new Error(`이미지 형식 오류: ${errorMessage}`);
       }
       
-      console.log('==================== 📏 VERTEX AI SDK 이미지 크기 확인 ====================');
+      console.log('==================== 📏 Google AI Studio 이미지 크기 확인 ====================');
       console.log(`🎯 요청한 비율: ${aspectRatio}`);
-      console.log(`📐 Vertex AI SDK가 실제로 생성한 이미지 크기: ${originalMetadata.width} × ${originalMetadata.height} pixels`);
+      console.log(`📐 Google AI Studio가 실제로 생성한 이미지 크기: ${originalMetadata.width} × ${originalMetadata.height} pixels`);
       console.log(`🔍 이미지 포맷: ${originalMetadata.format}`);
       console.log(`📊 예상 크기와 비교:`);
       if (aspectRatio === '1:1') {
@@ -373,7 +374,7 @@ export class NanoBananaService {
         console.log(`   - 실제: ${originalMetadata.width} × ${originalMetadata.height}`);
         console.log(`   - 크기 일치: ${originalMetadata.width === 1024 && originalMetadata.height === 1024 ? '✅' : '❌'}`);
       } else if (aspectRatio === '4:5') {
-        console.log(`   - 예상: 896 × 1152 (Vertex AI SDK 4:5 크기)`);
+        console.log(`   - 예상: 896 × 1152 (Google AI Studio 4:5 크기)`);
         console.log(`   - 실제: ${originalMetadata.width} × ${originalMetadata.height}`);
         console.log(`   - 크기 일치: ${originalMetadata.width === 896 && originalMetadata.height === 1152 ? '✅' : '❌'}`);
       }
@@ -467,7 +468,7 @@ export class NanoBananaService {
       }
       
       console.log(`✅ 이미지 생성 완료: ${imageUrl} (${generationTime}ms)`);
-      console.log(`🔢 Vertex AI SDK 실제 토큰 사용량: ${actualTokensUsed}`);
+      console.log(`🔢 Google AI Studio 실제 토큰 사용량: ${actualTokensUsed}`);
       console.log(`🎭 웹툰 컨텍스트 시스템 적용 완료`);
       
       return {
@@ -480,7 +481,7 @@ export class NanoBananaService {
       };
       
     } catch (error) {
-      console.error("🔥 Vertex AI SDK 이미지 생성 오류:", error);
+      console.error("🔥 Google AI Studio 이미지 생성 오류:", error);
       console.error("🔍 에러 상세:", {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
@@ -495,7 +496,7 @@ export class NanoBananaService {
         throw new Error('CONTENT_POLICY_VIOLATION');
       }
       
-      if (errorMessage.includes('Vertex AI SDK 호출 실패')) {
+      if (errorMessage.includes('Google AI Studio 호출 실패')) {
         throw new Error('잠시 후 다시 시도해 주세요. AI 서비스에 일시적인 문제가 발생했습니다.');
       }
       
@@ -664,7 +665,7 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
     aspectRatio: string
   ): Promise<{ imageUrl: string; thumbnailUrl: string }> {
     try {
-      console.log('💾 실제 Vertex AI SDK 생성 이미지 저장 시도 (WebP 최적화 포함)...');
+      console.log('💾 실제 Google AI Studio 생성 이미지 저장 시도 (WebP 최적화 포함)...');
       
       // 🚀 WebP 최적화 적용
       const originalBuffer = Buffer.from(base64Data, 'base64');
@@ -803,7 +804,7 @@ THIS IS A MANDATORY REQUIREMENT - ANY TEXT WILL BE REJECTED.`;
   }
   
   /**
-   * Vertex AI API 호출 (@google/genai SDK 사용) - 멀티모달 지원
+   * Google AI Studio API 호출 (@google/genai SDK 사용) - 멀티모달 지원
    */
   private async callGoogleAI(contents: any[]): Promise<any> {
     try {
@@ -875,12 +876,43 @@ ${characterCount > 2 ? '- Reference Image 3: Copy this character\'s EXACT appear
         partsCount: parts.length
       });
 
-      // Google AI Studio API 호출 - 재시도 로직 적용
+      // Google AI Studio REST API 호출 - 재시도 로직 적용
       const response = await this.retryWithBackoff(async () => {
-        return await this.genAI.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: parts
+        const url = `${this.apiEndpoint}/${this.model}:generateContent`;
+
+        console.log('🌐 REST API 호출:', url);
+
+        const fetchResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey
+          },
+          body: JSON.stringify({
+            contents: [{ parts }]
+          })
         });
+
+        if (!fetchResponse.ok) {
+          const errorText = await fetchResponse.text();
+          console.error('❌ API 오류 응답:', errorText);
+          throw new Error(`API 호출 실패: ${fetchResponse.status} ${fetchResponse.statusText} - ${errorText}`);
+        }
+
+        const jsonResponse = await fetchResponse.json();
+        console.log('📦 Raw API Response:', JSON.stringify(jsonResponse).substring(0, 500));
+
+        // SDK와 동일한 구조로 변환
+        const candidate = jsonResponse.candidates?.[0];
+        if (!candidate) {
+          throw new Error('API 응답에 candidates가 없습니다');
+        }
+
+        return {
+          text: candidate.content?.parts?.find((p: any) => p.text)?.text || '',
+          parts: candidate.content?.parts || [],
+          usageMetadata: jsonResponse.usageMetadata || {}
+        };
       });
 
       console.log('✅ Google AI Studio API 응답 수신 완료');
@@ -1164,7 +1196,7 @@ ${editPrompt}
       });
 
       // 5️⃣ callGoogleAI 메서드 사용 (기존 generateWebtoonPanel과 동일한 방식)
-      console.log(`🚀 Vertex AI SDK ${panelInfo} 편집 호출...`);
+      console.log(`🚀 Google AI Studio ${panelInfo} 편집 호출...`);
       const result = await this.callGoogleAI(contents);
       const response = result.response;
       
@@ -1465,56 +1497,62 @@ ${contextAwarePrompt}
       // Gemini API 호출
       const { width, height } = getRecommendedDimensions(aspectRatio);
       
-      console.log('🚀 Vertex AI SDK 호출 시작... {', 
+      console.log('🚀 Google AI Studio REST API 호출 시작... {',
         `model: '${this.model}', contentCount: ${contents.length}, hasReferenceImages: true`
       );
-      
-      const response = await this.genAI.models.generateContentStream({
-        model: this.model,
-        contents: contents,
-        config: {
-          responseModalities: ['IMAGE'],
-          imageGenerationConfig: {
-            aspectRatio: aspectRatio === '1:1' ? '1:1' : '4:5'
-          }
-        }
-      });
-      
-      let imageData = '';
-      let tokensUsed = 0;
-      let candidatesTokens = 0;
-      let promptTokens = 0;
-      
-      for await (const chunk of response) {
-        console.log('🔍 Chunk:', {
-          hasText: !!chunk.candidates?.[0]?.content?.parts?.some(p => p.text),
-          hasData: !!chunk.candidates?.[0]?.content?.parts?.some(p => p.inlineData),
-          hasCandidates: !!chunk.candidates?.length,
-          hasUsageMetadata: !!chunk.usageMetadata,
-          hasPromptFeedback: !!chunk.promptFeedback,
-          keys: Object.keys(chunk)
-        });
 
-        if (chunk.candidates?.[0]?.content?.parts) {
-          for (const part of chunk.candidates[0].content.parts) {
-            if (part.inlineData?.data) {
-              const dataSize = part.inlineData.data.length;
-              console.log(`🖼️ 이미지 발견: ${part.inlineData.mimeType}, ${dataSize} chars`);
-              imageData += part.inlineData.data;
+      // REST API 호출
+      const url = `${this.apiEndpoint}/${this.model}:generateContent`;
+      console.log('🌐 REST API URL:', url);
+
+      const fetchResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey
+        },
+        body: JSON.stringify({
+          contents: contents,
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+            imageGenerationConfig: {
+              aspectRatio: aspectRatio === '1:1' ? '1:1' : '4:5'
             }
           }
-        }
-        
-        if (chunk.usageMetadata) {
-          candidatesTokens = chunk.usageMetadata.candidatesTokens || 0;
-          promptTokens = chunk.usageMetadata.promptTokens || 0;
-          tokensUsed = chunk.usageMetadata.totalTokens || (candidatesTokens + promptTokens);
+        })
+      });
+
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error('❌ API 오류 응답:', errorText);
+        throw new Error(`API 호출 실패: ${fetchResponse.status} ${fetchResponse.statusText}`);
+      }
+
+      const jsonResponse = await fetchResponse.json();
+      console.log('📦 Response received');
+
+      // 응답에서 이미지 데이터 추출
+      const candidate = jsonResponse.candidates?.[0];
+      if (!candidate) {
+        throw new Error('API 응답에 candidates가 없습니다');
+      }
+
+      let imageData = '';
+      if (candidate.content?.parts) {
+        for (const part of candidate.content.parts) {
+          if (part.inlineData?.data) {
+            console.log(`🖼️ 이미지 발견: ${part.inlineData.mimeType}, ${part.inlineData.data.length} chars`);
+            imageData += part.inlineData.data;
+          }
         }
       }
-      
+
       if (!imageData) {
         throw new Error('이미지 데이터를 받지 못했습니다');
       }
+
+      const tokensUsed = jsonResponse.usageMetadata?.totalTokenCount || 0;
+      console.log('📊 토큰 사용량:', tokensUsed);
       
       const result = {
         imageData: Buffer.from(imageData, 'base64'),
@@ -1588,7 +1626,7 @@ ${contextAwarePrompt}
   }
 
   /**
-   * Vertex AI를 사용한 텍스트 생성 (대본 생성용) - 세션 격리 적용
+   * Google AI Studio를 사용한 텍스트 생성 (대본 생성용) - 세션 격리 적용
    */
   async generateText(
     prompt: string, 
@@ -1599,7 +1637,7 @@ ${contextAwarePrompt}
     }
   ): Promise<{ text: string; tokensUsed: number; sessionId?: string }> {
     try {
-      console.log('🔤 Vertex AI 텍스트 생성 시작...');
+      console.log('🔤 Google AI Studio 텍스트 생성 시작...');
       
       // 🧠 프로덕션 컨텍스트 시스템 적용
       const userId = options?.userId || 'anonymous';
@@ -1607,59 +1645,66 @@ ${contextAwarePrompt}
       
       console.log(`📝 텍스트 생성 시작: 프로젝트 ${projectId}, 유저 ${userId}`);
       
-      // Vertex AI 텍스트 생성 API 호출 - 이미지 생성과 동일한 방식 사용
+      // Google AI Studio 텍스트 생성 API 호출 - 이미지 생성과 동일한 방식 사용
       const response = await this.retryWithBackoff(async () => {
-        return await this.genAI.models.generateContentStream({
-          model: 'gemini-2.5-flash',
-          contents: [
-            {
-              role: 'USER',
-              parts: [{ text: prompt }]
-            }
-          ],
-          config: {
-            responseModalities: ['TEXT'],
+        const url = `${this.apiEndpoint}/gemini-2.5-flash:generateContent`;
+
+        console.log('🌐 REST API 텍스트 생성 호출:', url);
+
+        const fetchResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey
           },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: prompt }]
+              }
+            ]
+          })
         });
+
+        if (!fetchResponse.ok) {
+          const errorText = await fetchResponse.text();
+          console.error('❌ 텍스트 생성 API 오류:', errorText);
+          throw new Error(`텍스트 생성 API 호출 실패: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+
+        const jsonResponse = await fetchResponse.json();
+        console.log('📦 텍스트 API 응답 수신');
+
+        // SDK와 동일한 구조로 변환
+        const candidate = jsonResponse.candidates?.[0];
+        if (!candidate) {
+          throw new Error('API 응답에 candidates가 없습니다');
+        }
+
+        return {
+          text: candidate.content?.parts?.find((p: any) => p.text)?.text || '',
+          usageMetadata: jsonResponse.usageMetadata || {},
+          promptFeedback: jsonResponse.promptFeedback
+        };
       });
 
-      console.log('✅ Vertex AI SDK 텍스트 응답 수신 완료');
+      console.log('✅ Google AI Studio 텍스트 응답 수신 완료');
 
-      // 스트리밍 응답에서 텍스트 데이터 수집
-      let generatedText = '';
-      let totalTokens = 0;
-      let allChunks = [];
-      
-      for await (const chunk of response) {
-        console.log('🔍 텍스트 Chunk:', {
-          hasText: !!chunk.text,
-          hasUsageMetadata: !!chunk.usageMetadata,
-          hasPromptFeedback: !!chunk.promptFeedback,
-          keys: Object.keys(chunk)
-        });
-        
-        allChunks.push(chunk);
-        
-        // 텍스트 데이터 수집
-        if (chunk.text) {
-          generatedText += chunk.text;
-          console.log('📝 텍스트 수신:', chunk.text.substring(0, 100) + '...');
-        }
-        
-        // 토큰 사용량 수집
-        if (chunk.usageMetadata) {
-          totalTokens = chunk.usageMetadata.totalTokenCount || 0;
-        }
-        
-        // promptFeedback 확인 - 안전 필터링 감지
-        if (chunk.promptFeedback?.blockReason) {
-          console.log('🚫 안전 필터링으로 요청 차단됨:', chunk.promptFeedback.blockReason);
-          throw new Error('CONTENT_POLICY_VIOLATION');
-        }
+      // 응답에서 텍스트 데이터 추출
+      const generatedText = response.text;
+      const totalTokens = response.usageMetadata.totalTokenCount || 0;
+
+      console.log('📝 생성된 텍스트:', generatedText.substring(0, 100) + '...');
+      console.log('📊 토큰 사용량:', totalTokens);
+
+      // promptFeedback 확인 - 안전 필터링 감지
+      if (response.promptFeedback?.blockReason) {
+        console.log('🚫 안전 필터링으로 요청 차단됨:', response.promptFeedback.blockReason);
+        throw new Error('CONTENT_POLICY_VIOLATION');
       }
 
       if (!generatedText || generatedText.trim().length === 0) {
-        throw new Error('Vertex AI 텍스트 응답이 없습니다');
+        throw new Error('Google AI Studio 텍스트 응답이 없습니다');
       }
 
       const tokensUsed = totalTokens || 1000; // 기본값 설정
@@ -1667,10 +1712,9 @@ ${contextAwarePrompt}
       // 📋 토큰 사용량 기록
       console.log(`📊 텍스트 생성 토큰 사용량: ${tokensUsed}, 프로젝트: ${projectId}`);
       
-      console.log('✅ Vertex AI 텍스트 생성 완료:', {
+      console.log('✅ Google AI Studio 텍스트 생성 완료:', {
         textLength: generatedText.length,
-        tokensUsed,
-        chunksProcessed: allChunks.length
+        tokensUsed
       });
       console.log(`🧠 프로덕션 컨텍스트 시스템 텍스트 생성 완료`);
 
@@ -1681,32 +1725,32 @@ ${contextAwarePrompt}
       };
       
     } catch (error) {
-      console.error('❌ Vertex AI 텍스트 생성 실패:', error);
+      console.error('❌ Google AI Studio 텍스트 생성 실패:', error);
       console.error('❌ 에러 상세 정보:', {
         errorType: error?.constructor?.name,
         errorMessage: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined,
-        hasCredentials: !!this.genAI,
+        hasApiKey: !!this.apiKey,
         promptLength: prompt?.length
       });
       
       // 더 구체적인 에러 메시지 제공
       if (error instanceof Error) {
         if (error.message.includes('UNAUTHENTICATED') || error.message.includes('authentication')) {
-          throw new Error('Vertex AI 인증 실패: API 키 또는 서비스 계정을 확인해주세요');
+          throw new Error('Google AI Studio 인증 실패: API 키 또는 서비스 계정을 확인해주세요');
         }
         if (error.message.includes('PERMISSION_DENIED')) {
-          throw new Error('Vertex AI 권한 부족: 프로젝트 설정을 확인해주세요');
+          throw new Error('Google AI Studio 권한 부족: 프로젝트 설정을 확인해주세요');
         }
         if (error.message.includes('QUOTA_EXCEEDED')) {
-          throw new Error('Vertex AI 할당량 초과: 사용량을 확인해주세요');
+          throw new Error('Google AI Studio 할당량 초과: 사용량을 확인해주세요');
         }
         if (error.message.includes('timeout') || error.message.includes('deadline')) {
-          throw new Error('Vertex AI 요청 시간 초과: 잠시 후 다시 시도해주세요');
+          throw new Error('Google AI Studio 요청 시간 초과: 잠시 후 다시 시도해주세요');
         }
       }
       
-      throw new Error(`Vertex AI 텍스트 생성 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      throw new Error(`Google AI Studio 텍스트 생성 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
   }
 

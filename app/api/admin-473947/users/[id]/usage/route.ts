@@ -82,14 +82,15 @@ export async function GET(
       console.error('일별 통계 조회 오류:', dailyError);
     }
 
-    // 토큰 사용 내역 조회
+    // 토큰 사용 내역 조회 (transaction 테이블 사용 - 실제 데이터 소스)
     const { data: tokenUsage, error: tokenError } = await supabase
-      .from('token_usage')
+      .from('transaction')
       .select('*')
       .eq('userId', userId)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
-      .order('created_at', { ascending: false });
+      .eq('type', 'TOKEN_USAGE')
+      .gte('createdAt', startDate.toISOString())
+      .lte('createdAt', endDate.toISOString())
+      .order('createdAt', { ascending: false });
 
     if (tokenError) {
       console.error('토큰 사용 내역 조회 오류:', tokenError);
@@ -153,27 +154,27 @@ export async function GET(
       console.error('사용량 캐시 조회 오류:', cacheError);
     }
 
-    // 통계 계산
-    const totalTokensUsed = (tokenUsage || []).reduce((sum, usage) => sum + usage.total_tokens, 0);
+    // 통계 계산 (transaction 테이블 데이터 사용)
+    const totalTokensUsed = (tokenUsage || []).reduce((sum, transaction) => {
+      // tokens 필드는 음수로 저장되므로 절대값으로 변환
+      return sum + Math.abs(transaction.tokens || 0);
+    }, 0);
     const totalGenerations = (generations || []).length;
-    const averageGenerationTime = totalGenerations > 0 
-      ? (generations || []).reduce((sum, gen) => sum + (gen.generationTime || 0), 0) / totalGenerations 
+    const averageGenerationTime = totalGenerations > 0
+      ? (generations || []).reduce((sum, gen) => sum + (gen.generationTime || 0), 0) / totalGenerations
       : 0;
 
-    // 서비스별 사용량 통계
-    const serviceStats = (tokenUsage || []).reduce((acc, usage) => {
-      const service = usage.service_type;
+    // 서비스별 사용량 통계 (transaction 기반)
+    const serviceStats = (tokenUsage || []).reduce((acc, transaction) => {
+      // description 파싱 또는 기본값 사용
+      const service = transaction.description?.includes('이미지') ? 'image_generation' : 'other';
       if (!acc[service]) {
         acc[service] = {
           total_tokens: 0,
-          prompt_tokens: 0,
-          completion_tokens: 0,
           api_calls: 0
         };
       }
-      acc[service].total_tokens += usage.total_tokens;
-      acc[service].prompt_tokens += usage.prompt_tokens;
-      acc[service].completion_tokens += usage.completion_tokens;
+      acc[service].total_tokens += Math.abs(transaction.tokens || 0);
       acc[service].api_calls += 1;
       return acc;
     }, {} as Record<string, any>);

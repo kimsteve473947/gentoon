@@ -40,9 +40,9 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   const cspValue = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel.app https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com http://fonts.googleapis.com https://cdn.jsdelivr.net",
     "img-src 'self' data: blob: https://*.supabase.co https://*.vercel-storage.com https://storage.googleapis.com https://*.googleusercontent.com https://*.kakaocdn.net http://*.kakaocdn.net https://k.kakaocdn.net http://k.kakaocdn.net https://mud-kage.kakao.com http://mud-kage.kakao.com",
-    "connect-src 'self' https://*.supabase.co https://api.tosspayments.com https://log.tosspayments.com https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com https://generativelanguage.googleapis.com wss://*.supabase.co",
+    "connect-src 'self' https://*.supabase.co https://api.tosspayments.com https://log.tosspayments.com https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net wss://*.supabase.co",
     "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
     "frame-src 'self' https://js.tosspayments.com https://pay.toss.im https://*.tosspayments.com",
     "object-src 'none'",

@@ -81,7 +81,10 @@ export const ActionDropdown = memo<ActionDropdownProps>(({
           {actions.map((action, index) => (
             <React.Fragment key={action.id}>
               <DropdownMenuItem
-                onClick={action.onClick}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  action.onClick();
+                }}
                 disabled={action.disabled}
                 className={cn(
                   "cursor-pointer flex items-center gap-2",

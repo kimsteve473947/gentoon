@@ -99,8 +99,8 @@ export const CharacterCardWithDelete = memo(({ character, onDelete, onEdit }: Ch
 
   return (
     <>
-      <Card 
-        className={`group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] cursor-pointer ${
+      <Card
+        className={`group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${
           isProcessing ? 'opacity-50 pointer-events-none' : ''
         }`}
       >
@@ -112,12 +112,12 @@ export const CharacterCardWithDelete = memo(({ character, onDelete, onEdit }: Ch
                 src={character.thumbnailUrl}
                 alt={character.name}
                 fill
-                className="object-cover transition-transform duration-200 group-hover:scale-105"
+                className="object-cover transition-transform duration-200 group-hover:scale-105 pointer-events-none"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                 priority={false}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center pointer-events-none">
                 <Users className="h-12 w-12 text-gray-300" />
               </div>
             )}
@@ -144,24 +144,32 @@ export const CharacterCardWithDelete = memo(({ character, onDelete, onEdit }: Ch
               </div>
             )}
 
-            {/* 🚀 간소화된 액션 버튼 - 호버 시에만 표시 */}
-            <div className="absolute top-2 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {/* 🚀 간소화된 액션 버튼 - 항상 표시 */}
+            <div
+              className="absolute top-2 right-2 z-[100] pointer-events-auto"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-sm"
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 p-0 bg-white/95 hover:bg-white shadow-md hover:shadow-lg pointer-events-auto"
                     disabled={isProcessing}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
                   >
-                    <MoreVertical className="w-4 h-4" />
+                    <MoreVertical className="w-4 h-4 text-gray-600" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999]">
+                <DropdownMenuContent
+                  align="end"
+                  className="z-[9999] pointer-events-auto bg-white"
+                  side="bottom"
+                  sideOffset={5}
+                >
                   {onEdit && (
                     <DropdownMenuItem 
                       onClick={handleEdit}
@@ -184,10 +192,13 @@ export const CharacterCardWithDelete = memo(({ character, onDelete, onEdit }: Ch
                     <Eye className="w-4 h-4 mr-2" />
                     상세보기
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={handleDelete}
+                  <DropdownMenuItem
                     disabled={isProcessing}
                     className="text-red-600 focus:text-red-600 cursor-pointer"
+                    onSelect={async (e) => {
+                      e.preventDefault();
+                      await handleDelete(e as any);
+                    }}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     {isProcessing ? '삭제 중...' : '영구 삭제'}
